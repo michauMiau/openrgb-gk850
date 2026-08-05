@@ -1,13 +1,13 @@
-/*------------------------------------------*\
-||  OpenGK850WPluginV2.cpp                 |
-||                                            ||
-||  Plugin for GK850W keyboard using         |
-||  Virtual RGB Controller API               |
-||                                            ||
-||  garfi-kod 2026                            |
+/*-----------------------------------------*\
+||  OpenGK850WPlugin.cpp                   ||
+||                                         ||
+||  Plugin for GK850W keyboard using       ||
+||  Virtual RGB Controller API             ||
+||                                         ||
+||  garfi-kod, michaumiau 2026             ||
 \*-----------------------------------------*/
 
-#include "OpenGK850WPluginV2.h"
+#include "OpenGK850WPlugin.h"
 #include <QLabel>
 #include <QVBoxLayout>
 #include <QPushButton>
@@ -18,15 +18,15 @@
 // Common layouts: 87 (TKL), 96 (full compact), 104 (full-size)
 constexpr int NUM_LEDS = 96; // Adjust for your layout (87/96/104)
 
-void OpenGK850WPluginV2::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
+void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
     api = plugin_api_ptr;
-    printf("[GK850W V2] Plugin loading...\n");
+    printf("[GK850W] Plugin loading...\n");
 
     hid_init();
     dev_handle = hid_open(0x258A, 0x0049, NULL);
 
     if (!dev_handle) {
-        printf("[GK850W V2] Device not found (VID:PID 258A:0049)\n");
+        printf("[GK850W] Device not found (VID:PID 258A:0049)\n");
         leds.resize(NUM_LEDS, ToRGBColor(0, 0, 0));
         return;
     }
@@ -35,10 +35,10 @@ void OpenGK850WPluginV2::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
     hid_get_product_string(dev_handle, product, 127);
     std::wstring wprod(product);
     std::string prod(wprod.begin(), wprod.end());
-    printf("[GK850W V2] Product string: %s\n", prod.c_str());
+    printf("[GK850W] Product string: %s\n", prod.c_str());
 
     if (prod.find("GK850") == std::string::npos) {
-        printf("[GK850W V2] Not a GK850W device\n");
+        printf("[GK850W] Not a GK850W device\n");
         hid_close(dev_handle);
         dev_handle = nullptr;
         leds.resize(NUM_LEDS, ToRGBColor(0, 0, 0));
@@ -50,7 +50,7 @@ void OpenGK850WPluginV2::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
 
     // Create virtual controller setup
     RGBController_Setup setup = {};
-    setup.name = "GK850W Virtual";
+    setup.name = "GK850";
     setup.vendor = "BY Tech";
     setup.description = "Sinowealth GK850W (Virtual Plugin)";
     setup.version = "2.0.0";
@@ -113,7 +113,7 @@ void OpenGK850WPluginV2::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
     };
 
     setup.DeviceUpdateSingleLED = [](void* arg, int led_idx) {
-        auto* self = (OpenGK850WPluginV2*)arg;
+        auto* self = (OpenGK850WPlugin*)arg;
         if (!self->dev_handle || self->current_mode != MODE_GAME && self->current_mode != 1) return;
 
         unsigned char report[1032] = {0x06};
@@ -127,7 +127,7 @@ void OpenGK850WPluginV2::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
     };
 
     setup.DeviceUpdateMode = [](void* arg) {
-        auto* self = (OpenGK850WPluginV2*)arg;
+        auto* self = (OpenGK850WPlugin*)arg;
         if (!self->dev_handle) return;
 
         unsigned char report[6] = {0x05, (unsigned char)self->current_mode, 0x83, 0x00, 0x00, 0x00};
@@ -140,13 +140,13 @@ void OpenGK850WPluginV2::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
     virtual_controller = api->CreateVirtualRGBController(&setup);
     if (virtual_controller) {
         api->RegisterVirtualRGBController(virtual_controller);
-        printf("[GK850W V2] Virtual controller registered!\n");
+        printf("[GK850W] Virtual controller registered!\n");
     } else {
-        printf("[GK850W V2] Failed to create virtual controller\n");
+        printf("[GK850W] Failed to create virtual controller\n");
     }
 }
 
-QWidget* OpenGK850WPluginV2::GetWidget() {
+QWidget* OpenGK850WPlugin::GetWidget() {
     QWidget* w = new QWidget();
     auto* layout = new QVBoxLayout(w);
 
@@ -184,7 +184,7 @@ QWidget* OpenGK850WPluginV2::GetWidget() {
     return w;
 }
 
-QMenu* OpenGK850WPluginV2::GetTrayMenu() {
+QMenu* OpenGK850WPlugin::GetTrayMenu() {
     QMenu* menu = new QMenu("GK850W Controls");
 
     auto* static_action = menu->addAction("Static (Red)");
@@ -207,32 +207,32 @@ QMenu* OpenGK850WPluginV2::GetTrayMenu() {
     return menu;
 }
 
-OpenRGBPluginInfo OpenGK850WPluginV2::GetPluginInfo() {
+OpenRGBPluginInfo OpenGK850WPlugin::GetPluginInfo() {
     OpenRGBPluginInfo info;
-    info.Name = "GK850W V2";
+    info.Name = "GK850W";
     info.Description = "Virtual controller for GK850W keyboard - no main repo patch needed";
     info.Version = "2.0.0";
     info.Commit = "local-build";
     info.URL = "";
     info.Location = OPENRGB_PLUGIN_LOCATION_TOP;
-    info.Label = "GK850W V2";
+    info.Label = "GK850W";
     info.ProtocolVersion = 6;
     return info;
 }
 
-void OpenGK850WPluginV2::Unload() {}
+void OpenGK850WPlugin::Unload() {}
 
-OpenGK850WPluginV2::~OpenGK850WPluginV2() {
+OpenGK850WPlugin::~OpenGK850WPlugin() {
     if (dev_handle) {
         hid_close(dev_handle);
         dev_handle = nullptr;
     }
 }
 
-void OpenGK850WPluginV2::OnProfileAboutToLoad() {}
-void OpenGK850WPluginV2::OnProfileLoad(nlohmann::json) {}
-nlohmann::json OpenGK850WPluginV2::OnProfileSave() { return nlohmann::json{}; }
-unsigned char* OpenGK850WPluginV2::OnSDKCommand(unsigned int, unsigned char*, unsigned int*) { return nullptr; }
-void OpenGK850WPluginV2::ProfileManagerUpdated(unsigned) {}
-void OpenGK850WPluginV2::ResourceManagerUpdated(unsigned) {}
-void OpenGK850WPluginV2::SettingsManagerUpdated(unsigned) {}
+void OpenGK850WPlugin::OnProfileAboutToLoad() {}
+void OpenGK850WPlugin::OnProfileLoad(nlohmann::json) {}
+nlohmann::json OpenGK850WPlugin::OnProfileSave() { return nlohmann::json{}; }
+unsigned char* OpenGK850WPlugin::OnSDKCommand(unsigned int, unsigned char*, unsigned int*) { return nullptr; }
+void OpenGK850WPlugin::ProfileManagerUpdated(unsigned) {}
+void OpenGK850WPlugin::ResourceManagerUpdated(unsigned) {}
+void OpenGK850WPlugin::SettingsManagerUpdated(unsigned) {}
