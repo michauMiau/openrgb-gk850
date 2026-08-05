@@ -16,7 +16,7 @@
 
 // Number of LEDs per zone — adjust to match your keyboard layout
 // Common layouts: 87 (TKL), 96 (full compact), 104 (full-size)
-#define NUM_LEDS_PER_ZONE 96
+constexpr int NUM_LEDS = 96; // Adjust for your layout (87/96/104)
 
 void OpenGK850WPluginV2::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
     api = plugin_api_ptr;
@@ -27,7 +27,7 @@ void OpenGK850WPluginV2::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
 
     if (!dev_handle) {
         printf("[GK850W V2] Device not found (VID:PID 258A:0049)\n");
-        leds.resize(NUM_LEDS_PER_ZONE, ToRGBColor(0, 0, 0));
+        leds.resize(NUM_LEDS, ToRGBColor(0, 0, 0));
         return;
     }
 
@@ -41,12 +41,12 @@ void OpenGK850WPluginV2::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
         printf("[GK850W V2] Not a GK850W device\n");
         hid_close(dev_handle);
         dev_handle = nullptr;
-        leds.resize(NUM_LEDS_PER_ZONE, ToRGBColor(0, 0, 0));
+        leds.resize(NUM_LEDS, ToRGBColor(0, 0, 0));
         return;
     }
 
-    // Initialize LEDs — adjust NUM_LEDS_PER_ZONE for your layout (87/96/104)
-    leds.resize(NUM_LEDS_PER_ZONE, ToRGBColor(0, 0, 0));
+    // Initialize LEDs — adjust NUM_LEDS for your layout (87/96/104)
+    leds.resize(NUM_LEDS, ToRGBColor(0, 0, 0));
 
     // Create virtual controller setup
     RGBController_Setup setup = {};
@@ -87,7 +87,7 @@ void OpenGK850WPluginV2::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
     zone z;
     z.name = "Keyboard";
     z.type = ZONE_TYPE_MATRIX;
-    z.leds_count = NUM_LEDS_PER_ZONE;
+    z.leds_count = NUM_LEDS;
     setup.zones.push_back(z);
 
     // Callback for updating LEDs via HID
@@ -98,7 +98,7 @@ void OpenGK850WPluginV2::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
         if (self->current_mode == MODE_GAME || self->current_mode == 1) {
             // Custom mode - send per-key LED data (Report ID 6)
             unsigned char report[1032] = {0x06};
-            for (int i = 0; i < NUM_LEDS_PER_ZONE && i < (int)self->leds.size(); i++) {
+            for (int i = 0; i < NUM_LEDS && i < (int)self->leds.size(); i++) {
                 RGBColor c = self->leds[i];
                 report[i * 3 + 1] = c & 0xFF;
                 report[i * 3 + 2] = (c >> 8) & 0xFF;
@@ -117,7 +117,7 @@ void OpenGK850WPluginV2::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
         if (!self->dev_handle || self->current_mode != MODE_GAME && self->current_mode != 1) return;
 
         unsigned char report[1032] = {0x06};
-        for (int i = 0; i < NUM_LEDS_PER_ZONE && i < (int)self->leds.size(); i++) {
+        for (int i = 0; i < NUM_LEDS && i < (int)self->leds.size(); i++) {
             RGBColor c = self->leds[i];
             report[i * 3 + 1] = c & 0xFF;
             report[i * 3 + 2] = (c >> 8) & 0xFF;
