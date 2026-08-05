@@ -92,7 +92,7 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
 
     // Callback for updating LEDs via HID
     setup.DeviceUpdateLEDs = [](void* arg) {
-        auto* self = (OpenGK850WPluginV2*)arg;
+        auto* self = (OpenGK850WPlugin*)arg;
         if (!self->dev_handle) return;
 
         if (self->current_mode == MODE_GAME || self->current_mode == 1) {
