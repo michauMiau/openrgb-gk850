@@ -12,7 +12,7 @@
 #include <QVBoxLayout>
 #include <QPushButton>
 #include <QComboBox>
-#include <iostream>
+#include "LogManager.h"
 
 // Number of LEDs per zone — adjust to match your keyboard layout
 // NO, A 60% KEYBOARD DOESN'T FUCKING HAVE 96 KEYS YOU DUMB FUCK
@@ -20,13 +20,13 @@ constexpr int NUM_LEDS = 61; // Adjust for your layout (87/96/104)
 
 void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
     api = plugin_api_ptr;
-    printf("[GK850W] Plugin loading...\n");
+    LOG_INFO("[GK850W] Plugin loading...\n");
 
     hid_init();
     dev_handle = hid_open(0x258A, 0x0049, NULL);
 
     if (!dev_handle) {
-        printf("[GK850W] Device not found (VID:PID 258A:0049)\n");
+        LOG_INFO("[GK850W] Device not found (VID:PID 258A:0049)\n");
         leds.resize(NUM_LEDS, ToRGBColor(0, 0, 0));
         return;
     }
@@ -35,10 +35,10 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
     hid_get_product_string(dev_handle, product, 127);
     std::wstring wprod(product);
     std::string prod(wprod.begin(), wprod.end());
-    printf("[GK850W] Product string: %s\n", prod.c_str());
+    LOG_INFO("[GK850W] Product string: %s\n", prod.c_str());
 
     if (prod.find("GK850") == std::string::npos) {
-        printf("[GK850W] Not a GK850W device\n");
+        LOG_INFO("[GK850W] Not a GK850W device\n");
         hid_close(dev_handle);
         dev_handle = nullptr;
         leds.resize(NUM_LEDS, ToRGBColor(0, 0, 0));
@@ -140,9 +140,9 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
     virtual_controller = api->CreateVirtualRGBController(&setup);
     if (virtual_controller) {
         api->RegisterVirtualRGBController(virtual_controller);
-        printf("[GK850W] Virtual controller registered!\n");
+        LOG_INFO("[GK850W] Virtual controller registered!\n");
     } else {
-        printf("[GK850W] Failed to create virtual controller\n");
+        LOG_INFO("[GK850W] Failed to create virtual controller\n");
     }
 }
 
