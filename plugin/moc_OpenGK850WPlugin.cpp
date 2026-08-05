@@ -1,12 +1,12 @@
 /****************************************************************************
-** Meta object code from reading C++ file 'OpenGK850WPluginV2.h'
+** Meta object code from reading C++ file 'OpenGK850WPlugin.h'
 **
 ** Created by: The Qt Meta Object Compiler version 68 (Qt 6.8.2)
 **
 ** WARNING! All changes made in this file will be lost!
 *****************************************************************************/
 
-#include "OpenGK850WPluginV2.h"
+#include "OpenGK850WPlugin.h"
 #include <QtGui/qtextcursor.h>
 #include <QtCore/qmetatype.h>
 #include <QtCore/qplugin.h>
@@ -18,7 +18,7 @@
 
 #include <QtCore/qxptype_traits.h>
 #if !defined(Q_MOC_OUTPUT_REVISION)
-#error "The header file 'OpenGK850WPluginV2.h' doesn't include <QObject>."
+#error "The header file 'OpenGK850WPlugin.h' doesn't include <QObject>."
 #elif Q_MOC_OUTPUT_REVISION != 68
 #error "This file was generated using the moc from 6.8.2. It"
 #error "cannot be used with the include files from this version of Qt."
@@ -33,19 +33,19 @@ QT_WARNING_PUSH
 QT_WARNING_DISABLE_DEPRECATED
 QT_WARNING_DISABLE_GCC("-Wuseless-cast")
 namespace {
-struct qt_meta_tag_ZN18OpenGK850WPluginV2E_t {};
+struct qt_meta_tag_ZN18OpenGK850WPluginE_t {};
 } // unnamed namespace
 
 
 #ifdef QT_MOC_HAS_STRINGDATA
-static constexpr auto qt_meta_stringdata_ZN18OpenGK850WPluginV2E = QtMocHelpers::stringData(
-    "OpenGK850WPluginV2"
+static constexpr auto qt_meta_stringdata_ZN18OpenGK850WPluginE = QtMocHelpers::stringData(
+    "OpenGK850WPlugin"
 );
 #else  // !QT_MOC_HAS_STRINGDATA
 #error "qtmochelpers.h not found or too old."
 #endif // !QT_MOC_HAS_STRINGDATA
 
-Q_CONSTINIT static const uint qt_meta_data_ZN18OpenGK850WPluginV2E[] = {
+Q_CONSTINIT static const uint qt_meta_data_ZN18OpenGK850WPluginE[] = {
 
  // content:
       12,       // revision
@@ -61,37 +61,37 @@ Q_CONSTINIT static const uint qt_meta_data_ZN18OpenGK850WPluginV2E[] = {
        0        // eod
 };
 
-Q_CONSTINIT const QMetaObject OpenGK850WPluginV2::staticMetaObject = { {
+Q_CONSTINIT const QMetaObject OpenGK850WPlugin::staticMetaObject = { {
     QMetaObject::SuperData::link<QObject::staticMetaObject>(),
-    qt_meta_stringdata_ZN18OpenGK850WPluginV2E.offsetsAndSizes,
-    qt_meta_data_ZN18OpenGK850WPluginV2E,
+    qt_meta_stringdata_ZN18OpenGK850WPluginE.offsetsAndSizes,
+    qt_meta_data_ZN18OpenGK850WPluginE,
     qt_static_metacall,
     nullptr,
-    qt_incomplete_metaTypeArray<qt_meta_tag_ZN18OpenGK850WPluginV2E_t,
+    qt_incomplete_metaTypeArray<qt_meta_tag_ZN18OpenGK850WPluginE_t,
         // Q_OBJECT / Q_GADGET
-        QtPrivate::TypeAndForceComplete<OpenGK850WPluginV2, std::true_type>
+        QtPrivate::TypeAndForceComplete<OpenGK850WPlugin, std::true_type>
     >,
     nullptr
 } };
 
-void OpenGK850WPluginV2::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, void **_a)
+void OpenGK850WPlugin::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, void **_a)
 {
-    auto *_t = static_cast<OpenGK850WPluginV2 *>(_o);
+    auto *_t = static_cast<OpenGK850WPlugin *>(_o);
     (void)_t;
     (void)_c;
     (void)_id;
     (void)_a;
 }
 
-const QMetaObject *OpenGK850WPluginV2::metaObject() const
+const QMetaObject *OpenGK850WPlugin::metaObject() const
 {
     return QObject::d_ptr->metaObject ? QObject::d_ptr->dynamicMetaObject() : &staticMetaObject;
 }
 
-void *OpenGK850WPluginV2::qt_metacast(const char *_clname)
+void *OpenGK850WPlugin::qt_metacast(const char *_clname)
 {
     if (!_clname) return nullptr;
-    if (!strcmp(_clname, qt_meta_stringdata_ZN18OpenGK850WPluginV2E.stringdata0))
+    if (!strcmp(_clname, qt_meta_stringdata_ZN18OpenGK850WPluginE.stringdata0))
         return static_cast<void*>(this);
     if (!strcmp(_clname, "OpenRGBPluginInterface"))
         return static_cast< OpenRGBPluginInterface*>(this);
@@ -100,14 +100,14 @@ void *OpenGK850WPluginV2::qt_metacast(const char *_clname)
     return QObject::qt_metacast(_clname);
 }
 
-int OpenGK850WPluginV2::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
+int OpenGK850WPlugin::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
 {
     _id = QObject::qt_metacall(_c, _id, _a);
     return _id;
 }
 
-#ifdef QT_MOC_EXPORT_PLUGIN_V2
-static constexpr unsigned char qt_pluginMetaDataV2_OpenGK850WPluginV2[] = {
+#ifdef QT_MOC_EXPORT_PLUGIN_
+static constexpr unsigned char qt_pluginMetaData_OpenGK850WPlugin[] = {
     0xbf, 
     // "IID"
     0x02,  0x78,  0x22,  'o',  'r',  'g',  '.',  'o', 
@@ -148,10 +148,10 @@ static constexpr unsigned char qt_pluginMetaDataV2_OpenGK850WPluginV2[] = {
     '2',  '.',  '0',  '.',  '0', 
     0xff, 
 };
-QT_MOC_EXPORT_PLUGIN_V2(OpenGK850WPluginV2, OpenGK850WPluginV2, qt_pluginMetaDataV2_OpenGK850WPluginV2)
+QT_MOC_EXPORT_PLUGIN_(OpenGK850WPlugin, OpenGK850WPlugin, qt_pluginMetaData_OpenGK850WPlugin)
 #else
 QT_PLUGIN_METADATA_SECTION
-Q_CONSTINIT static constexpr unsigned char qt_pluginMetaData_OpenGK850WPluginV2[] = {
+Q_CONSTINIT static constexpr unsigned char qt_pluginMetaData_OpenGK850WPlugin[] = {
     'Q', 'T', 'M', 'E', 'T', 'A', 'D', 'A', 'T', 'A', ' ', '!',
     // metadata version, Qt version, architectural requirements
     0, QT_VERSION_MAJOR, QT_VERSION_MINOR, qPluginArchRequirements(),
@@ -195,7 +195,7 @@ Q_CONSTINIT static constexpr unsigned char qt_pluginMetaData_OpenGK850WPluginV2[
     '2',  '.',  '0',  '.',  '0', 
     0xff, 
 };
-QT_MOC_EXPORT_PLUGIN(OpenGK850WPluginV2, OpenGK850WPluginV2)
-#endif  // QT_MOC_EXPORT_PLUGIN_V2
+QT_MOC_EXPORT_PLUGIN(OpenGK850WPlugin, OpenGK850WPlugin)
+#endif  // QT_MOC_EXPORT_PLUGIN_
 
 QT_WARNING_POP
