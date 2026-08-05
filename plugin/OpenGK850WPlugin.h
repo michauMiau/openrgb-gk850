@@ -1,5 +1,5 @@
-#ifndef OPENGK850WPLUGINV2_H
-#define OPENGK850WPLUGINV2_H
+#ifndef OPENGK850WPLUGIN_H
+#define OPENGK850WPLUGIN_H
 
 #include "OpenRGBPluginInterface.h"
 #include <QObject>
@@ -7,7 +7,7 @@
 #include <QMap>
 #include <hidapi.h>
 
-// Sinowealth mode constants (from pcap analysis)
+// Sinowealth mode constants
 #define MODE_STATIC              0x83
 #define MODE_BREATHING           0x84
 #define MODE_TRANSITION          0x86
@@ -27,18 +27,18 @@
 #define MODE_PULSING             0x12
 #define MODE_COLLISION           0x13
 #define MODE_FLASH               0x14
-#define MODE_GAME                0x15   // Custom per-key / Sound Reactive
+#define MODE_GAME                0x15   // Addressable Mode for this keyboard
 #define MODE_OFF                 0x16
 
-class OpenGK850WPluginV2 : public QObject, public OpenRGBPluginInterface
+class OpenGK850WPlugin : public QObject, public OpenRGBPluginInterface
 {
     Q_OBJECT
-    // Use FILE parameter with JSON that has TOP-LEVEL keys (like HttpHook plugin)
-    Q_PLUGIN_METADATA(IID "org.openrgb.OpenRGBPluginInterface" FILE "OpenGK850WPluginV2.json")
+    // Use FILE parameter with JSON that has TOP-LEVEL keys (like other plugins)
+    Q_PLUGIN_METADATA(IID "org.openrgb.OpenRGBPluginInterface" FILE "OpenGK850WPlugin.json")
     Q_INTERFACES(OpenRGBPluginInterface)
 
 public:
-    ~OpenGK850WPluginV2() override;
+    ~OpenGK850WPlugin() override;
 
     void Load(OpenRGBPluginAPIInterface* api) override;
     void Unload() override;
