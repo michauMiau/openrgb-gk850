@@ -15,8 +15,8 @@
 #include <iostream>
 
 // Number of LEDs per zone — adjust to match your keyboard layout
-// Common layouts: 87 (TKL), 96 (full compact), 104 (full-size)
-constexpr int NUM_LEDS = 96; // Adjust for your layout (87/96/104)
+// NO, A 60% KEYBOARD DOESN'T FUCKING HAVE 96 KEYS YOU DUMB FUCK
+constexpr int NUM_LEDS = 61; // Adjust for your layout (87/96/104)
 
 void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
     api = plugin_api_ptr;
