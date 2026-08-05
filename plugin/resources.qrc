@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/">
+        <!-- No QRC resources - using FILE parameter in Q_PLUGIN_METADATA instead -->
+    </qresource>
+</RCC>

@@ -1,0 +1,9 @@
+{
+    "Id": "OpenGK850WPluginV2",
+    "Name": "GK850W Virtual Controller Plugin",
+    "VersionStr": "2.0.0",
+    "Url": "",
+    "Description": "Virtual controller plugin for GK850W keyboard with sound reactive effects",
+    "OpenRGBPluginAPIVersion": 5,
+    "Commit": ""
+}
