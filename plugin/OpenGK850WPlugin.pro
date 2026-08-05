@@ -1,12 +1,12 @@
 QT += widgets
 
-TARGET = libOpenGK850WPluginV2
+TARGET = libOpenGK850WPlugin
 TEMPLATE = lib
 CONFIG += plugin  # This is critical for Qt to properly embed metadata!
 DEFINES += OPENRGB_PLUGIN
 
-SOURCES += OpenGK850WPluginV2.cpp
-HEADERS += OpenGK850WPluginV2.h
+SOURCES += OpenGK850WPlugin.cpp
+HEADERS += OpenGK850WPlugin.h
 RESOURCES += resources.qrc
 
 unix {
