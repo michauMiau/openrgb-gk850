@@ -1,5 +1,5 @@
 <RCC>
     <qresource prefix="/">
-        <!-- No QRC resources - using FILE parameter in Q_PLUGIN_METADATA instead -->
+        <!-- File for resorces like fonts and images, NOT FUCKING PLUGIN METADATA -->
     </qresource>
 </RCC>
