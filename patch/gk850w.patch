@@ -1,0 +1,541 @@
+diff --git a/Controllers/SinowealthController/SinowealthControllerDetect.cpp b/Controllers/SinowealthController/SinowealthControllerDetect.cpp
+index 09b2859..3d3486a 100644
+--- a/Controllers/SinowealthController/SinowealthControllerDetect.cpp
++++ b/Controllers/SinowealthController/SinowealthControllerDetect.cpp
+@@ -30,6 +30,7 @@
+ #include "RGBController_GenesisXenon200.h"
+ #include <hidapi.h>
+ #include "LogManager.h"
++#include "StringUtils.h"
+ 
+ #define SINOWEALTH_VID                      0x258A
+ 
+@@ -428,10 +429,33 @@ DetectedControllers DetectSinowealthGK850W(hid_device_info* info, const std::str
+ 
+     if(dev)
+     {
+-        SinowealthGK850WController*     controller     = new SinowealthGK850WController(dev, info->path, name);
+-        RGBController_SinowealthGK850W* rgb_controller = new RGBController_SinowealthGK850W(controller);
++        // Verify this is actually a GK850W by checking product string
++        wchar_t product_string[256];
++        int ret = hid_get_product_string(dev, product_string, 256);
+ 
+-        detected_controllers.push_back(rgb_controller);
++        if(ret == 0)
++        {
++            // Close device if we can't read product string
++            hid_close(dev);
++            return(detected_controllers);
++        }
++
++        std::string prod = StringUtils::wstring_to_string(product_string);
++        LOG_INFO("Detected Sinowealth device product string: '%s'", prod.c_str());
++
++        // Only match "GK850" or "GK850W" - NOT "FL ESPORTS F11" or other similar devices
++        if(prod.find("GK850") != std::string::npos || prod.find("gk850") != std::string::npos)
++        {
++            gk850w::SinowealthGK850WController* controller = new gk850w::SinowealthGK850WController(dev, info->path, name);
++            RGBController_SinowealthGK850W* rgb_controller = new RGBController_SinowealthGK850W(controller);
++
++            detected_controllers.push_back(rgb_controller);
++        }
++        else
++        {
++            LOG_WARNING("Device has matching VID:PID but different product string '%s' - skipping to avoid brick risk", prod.c_str());
++            hid_close(dev);
++        }
+     }
+ 
+     return(detected_controllers);
+diff --git a/Controllers/SinowealthController/SinowealthGK850WController/RGBController_SinowealthGK850W.cpp b/Controllers/SinowealthController/SinowealthGK850WController/RGBController_SinowealthGK850W.cpp
+index 3e0e0c2..ce932c3 100644
+--- a/Controllers/SinowealthController/SinowealthGK850WController/RGBController_SinowealthGK850W.cpp
++++ b/Controllers/SinowealthController/SinowealthGK850WController/RGBController_SinowealthGK850W.cpp
+@@ -1,11 +1,11 @@
+ /*------------------------------------------*\
+ ||  RGBController_SinowealthGK850W.cpp      |
+-|                                            |
+-|  Definitions and types for BY Tech / MAD   |
+-|  Dog GK850W keyboard (Sinowealth chip)     |
+-|                                            |
+-|  garfi-kod 2026                            |
+-\*-----------------------------------------=*/
++||                                          |
++||  Definitions and types for BY Tech / MAD |
++||  Dog GK850W keyboard (Sinowealth chip)   |
++||                                          |
++||  garfi-kod 2026                          |
++\*-----------------------------------------*/
+ 
+ #include "RGBControllerKeyNames.h"
+ #include "RGBController_SinowealthGK850W.h"
+@@ -106,7 +106,7 @@ static const char *led_names_tkl[] =
+     KEY_EN_RIGHT_ARROW,
+ };
+ 
+-RGBController_SinowealthGK850W::RGBController_SinowealthGK850W(SinowealthGK850WController* controller_ptr)
++RGBController_SinowealthGK850W::RGBController_SinowealthGK850W(gk850w::SinowealthGK850WController* controller_ptr)
+ {
+     controller                      = controller_ptr;
+ 
+diff --git a/Controllers/SinowealthController/SinowealthGK850WController/RGBController_SinowealthGK850W.h b/Controllers/SinowealthController/SinowealthGK850WController/RGBController_SinowealthGK850W.h
+index fd6e43f..6b74fc7 100644
+--- a/Controllers/SinowealthController/SinowealthGK850WController/RGBController_SinowealthGK850W.h
++++ b/Controllers/SinowealthController/SinowealthGK850WController/RGBController_SinowealthGK850W.h
+@@ -1,11 +1,11 @@
+ /*------------------------------------------*\
+-||  RGBController_SinowealthGK850W.h        |\
+-||                                            |\
+-||  Definitions and types for BY Tech / MAD   |\
+-||  Dog GK850W keyboard (Sinowealth chip)     |\
+-||                                            |\
+-||  garfi-kod 2026                            |\
+-\*-----------------------------------------=*/
++||  RGBController_SinowealthGK850W.h        |
++||                                          |
++||  Definitions and types for BY Tech / MAD |
++||  Dog GK850W keyboard (Sinowealth chip)   |
++||                                          |
++||  garfi-kod 2026                          |
++\*-----------------------------------------*/
+ 
+ #pragma once
+ #include "RGBController.h"
+@@ -13,21 +13,16 @@
+ 
+ class RGBController_SinowealthGK850W : public RGBController
+ {
+-public:
+-    RGBController_SinowealthGK850W(SinowealthGK850WController* controller_ptr);
+-    ~RGBController_SinowealthGK850W();
++    public:
++        RGBController_SinowealthGK850W(gk850w::SinowealthGK850WController* controller_ptr);
++        ~RGBController_SinowealthGK850W();
+ 
+-    void            SetupZones();
++        void SetupZones();
++        void DeviceUpdateLEDs();
++        void DeviceUpdateZoneLEDs(int zone_idx);
++        void DeviceUpdateSingleLED(int led_idx);
++        void DeviceUpdateMode();
+ 
+-    void            DeviceUpdateLEDs();
+-    void            DeviceUpdateZoneLEDs(int zone);
+-    void            DeviceUpdateSingleLED(int led);
+-
+-    void            DeviceUpdateMode();
+-
+-private:
+-    SinowealthGK850WController* controller;
+-
+-    void            AddMode(std::string name, unsigned char value, bool color_support);
+-    unsigned char   MapRGBToColorEnum(RGBColor color);
++    private:
++        gk850w::SinowealthGK850WController* controller;
+ };
+diff --git a/Controllers/SinowealthController/SinowealthGK850WController/SinowealthGK850WController.cpp b/Controllers/SinowealthController/SinowealthGK850WController/SinowealthGK850WController.cpp
+index a4ebee1..9712538 100644
+--- a/Controllers/SinowealthController/SinowealthGK850WController/SinowealthGK850WController.cpp
++++ b/Controllers/SinowealthController/SinowealthGK850WController/SinowealthGK850WController.cpp
+@@ -1,80 +1,92 @@
+ /*------------------------------------------*\
+ ||  SinowealthGK850WController.cpp          |
+-|                                            |
+-|  Implementation for MAD Dog GK850W RGB     |
+-|  Keyboard (BY Tech / Sinowealth chip)      |
+-|  USB ID: 258a:0049                         |
+-*------------------------------------------*/
++||                                          |
++||  Controller for BY Tech / MAD Dog       |
++||  GK850W keyboard (Sinowealth chip)      |
++||                                          |
++||  garfi-kod 2026                          |
++\*-----------------------------------------*/
+ 
+-#include <cstring>
+-#include "LogManager.h"
+ #include "SinowealthGK850WController.h"
+-#include "StringUtils.h"
++#include "LogManager.h"
++#include <cstring>
+ 
+-static unsigned char send_buf[6];
++namespace gk850w
++{
++    SinowealthGK850WController::SinowealthGK850WController(hid_device* dev_ptr, const char* path, const std::string& dev_name)
++    {
++        (void)path;
++        dev     = dev_ptr;
++        name    = dev_name;
++    }
+ 
+-SinowealthGK850WController::SinowealthGK850WController(hid_device* dev_handle, const char* path, std::string dev_name) : dev(dev_handle), name(dev_name), location(path ? path : "")
+-{}
++    SinowealthGK850WController::~SinowealthGK850WController()
++    {
++        if(dev)
++        {
++            hid_close(dev);
++            dev = nullptr;
++        }
++    }
+ 
+-SinowealthGK850WController::~SinowealthGK850WController()
+-{
+-    if (dev) hid_close(dev);
+-}
++    const std::string SinowealthGK850WController::GetNameString()
++    {
++        return(name);
++    }
+ 
+-std::string SinowealthGK850WController::GetDeviceLocation()
+-{
+-    return location;
+-}
++    const std::string SinowealthGK850WController::GetSerialString()
++    {
++        return("GK850W-" + name);
++    }
+ 
+-std::string SinowealthGK850WController::GetNameString()
+-{
+-    return name;
+-}
++    const std::string SinowealthGK850WController::GetDeviceLocation()
++    {
++        return(std::string("HID: ") + std::string(dev != nullptr ? "unknown" : "closed"));
++    }
+ 
+-std::string SinowealthGK850WController::GetSerialString()
+-{
+-    wchar_t serial_string[128];
+-    int ret = hid_get_serial_number_string(dev, serial_string, 128);
+-    
+-    if(ret != 0)
++    void SinowealthGK850WController::SetMode(unsigned int mode_value, unsigned char speed, unsigned char brightness)
+     {
+-        return("");
++        if(!dev)
++        {
++            return;
++        }
++
++        // Report ID 5 (0x05): Mode command
++        // Format: 05 8X YY ZZ WW 00 00
++        // where X = mode, Y = speed/brightness, Z/W = additional params
++        unsigned char cmd[6] = {0x05, 0x80 | mode_value, speed, brightness, 0x00, 0x00};
++
++        if(hid_send_feature_report(dev, cmd, sizeof(cmd)) < 0)
++        {
++            LOG_ERROR("Failed to send SetMode command to GK850W");
++        }
+     }
+-    
+-    return(StringUtils::wstring_to_string(serial_string));
+-}
+ 
+-void SinowealthGK850WController::SetMode(unsigned char mode, unsigned char brightness, unsigned char speed)
+-{
+-    // Report 5: 0x05 | cmd | mode | (brightness<<4)|speed | ? | ?
+-    memset(send_buf, 0x00, sizeof(send_buf));
+-    send_buf[0] = 0x05;
+-    send_buf[1] = 0x83;      // Command byte (consistent across all modes)
+-    send_buf[2] = mode;
+-    send_buf[3] = (brightness << 4) | speed;
+-    hid_send_feature_report(dev, send_buf, sizeof(send_buf));
+-}
++    void SinowealthGK850WController::SetLEDsDirect(std::vector<RGBColor> colors)
++    {
++        if(!dev || colors.empty())
++        {
++            return;
++        }
+ 
+-void SinowealthGK850WController::SetLEDsDirect(std::vector<unsigned int>& colors)
+-{
+-    unsigned char report[1032];
+-    
+-    memset(report, 0x00, sizeof(report));
+-    report[0] = 0x06;   // Report ID for per-key data
+-    
+-    int led_count = std::min<int>(colors.size(), 130);
+-    
+-    for(int i = 0; i < led_count; ++i) {
+-        int offset = (i + 1) * 4;
+-        
+-        unsigned char r = RGBGetRValue(colors[i]);
+-        unsigned char g = RGBGetGValue(colors[i]);
+-        unsigned char b = RGBGetBValue(colors[i]);
+-        
+-        report[offset]     = (r >> 3) & 0x1F;  // 5-bit red
+-        report[offset + 1] = (g >> 3) & 0x1F;  // 5-bit green
+-        report[offset + 2] = (b >> 3) & 0x1F;  // 5-bit blue
++        // Report ID 6 (0x06): Per-key LED data, 1032 bytes total
++        // First byte is report ID (0x06), rest is LED data
++        unsigned char report[1032];
++        memset(report, 0x00, sizeof(report));
++        report[0] = 0x06;
++
++        // Fill LED colors - each key uses 3 bytes (RGB)
++        unsigned int num_leds = std::min(colors.size(), (size_t)1029); // Leave room for header
++        for(unsigned int i = 0; i < num_leds; i++)
++        {
++            report[1 + i * 3]     = RGBGetRValue(colors[i]);
++            report[2 + i * 3]     = RGBGetGValue(colors[i]);
++            report[3 + i * 3]     = RGBGetBValue(colors[i]);
++        }
++
++        if(hid_send_feature_report(dev, report, sizeof(report)) < 0)
++        {
++            LOG_ERROR("Failed to send SetLEDsDirect command to GK850W");
++        }
+     }
+-    
+-    hid_send_feature_report(dev, report, sizeof(report));
+ }
+diff --git a/Controllers/SinowealthController/SinowealthGK850WController/SinowealthGK850WController.h b/Controllers/SinowealthController/SinowealthGK850WController/SinowealthGK850WController.h
+index 126472a..e33455c 100644
+--- a/Controllers/SinowealthController/SinowealthGK850WController/SinowealthGK850WController.h
++++ b/Controllers/SinowealthController/SinowealthGK850WController/SinowealthGK850WController.h
+@@ -1,12 +1,11 @@
+ /*------------------------------------------*\
+-||  SinowealthGK850WController.h            |\
+-||                                            |\
+-||  Definitions and types for MAD Dog GK850W  |\
+-||  (BY Tech GK850) RGB Keyboard              |\
+-||  USB ID: 258a:0049                         |\
+-||                                            |\
+-||  Based on SinowealthKeyboardController     |\
+-\*-----------------------------------------=*/
++||  SinowealthGK850WController.h           |
++||                                          |
++||  Controller for BY Tech / MAD Dog       |
++||  GK850W keyboard (Sinowealth chip)      |
++||                                          |
++||  garfi-kod 2026                          |
++\*-----------------------------------------*/
+ 
+ #pragma once
+ #include "RGBController.h"
+@@ -24,28 +23,36 @@ namespace gk850w
+     // LED Mode definitions from the device's firmware
+     enum
+     {
+-        MODE_STATIC                   = 0x01,   // Stały kolor (still color)
+-        MODE_BREATHING                = 0x02,   // Oddech (breathing)
+-        MODE_TRANSITION               = 0x03,   // Przejście (transition)
+-        MODE_ILLUMINATE_LINE          = 0x04,   // Podświetl linię (illuminate line)
+-        MODE_RAIN                     = 0x05,     // Deszcz (rain)
+-        MODE_DOUBLE_TRANSITION        = 0x06,   // Podwójne przejście (double transition)
+-        MODE_WATER_DROP               = 0x07,   // Kropla wody (water drop)
+-        MODE_FLASHING_STARS           = 0x08,   // Migające gwiazdy (flashing stars)
+-        MODE_SHADOW                   = 0x09,   // Cień (shadow)
+-        MODE_SNAKE                    = 0x0A,   // Wąż (snake)
+-        MODE_NEON_WAVE                = 0x0B,   // Neonowa fala (Neon Wave)
+-        MODE_MARK                     = 0x0C,   // Ślad (mark)
+-        MODE_SINE_WAVE                = 0x0D,   // Sinusoida (sine wave)
+-        MODE_SCANNING                 = 0x0E,   // Skanowanie (scanning)
+-        MODE_CAROUSEL                 = 0x0F,   // Karuzela (carousel)
+-        MODE_WATERFALL                = 0x10,   // Wodospad (water fall)
+-        MODE_PULSING                  = 0x11,   // Pulsowanie (pulsing)
+-        MODE_EXPLOSION                = 0x12,   // Eksplozja (explosion)
+-        MODE_COLLISION                = 0x13,   // Kolizja (collision)
+-        MODE_FLASH                    = 0x14,   // Błysk (Flash)
+-        MODE_GAME                     = 0x15,   // Tryb gry (Game mode - per-key addressing)
+-        MODE_OFF                      = 0x16,   // Wyłączone (Off)
++        MODE_STATIC               = 0x83,   // Statyczny (Static)
++        MODE_BREATHING            = 0x84,   // Oddychanie (Breathing)
++        MODE_TRANSITION           = 0x86,   // Przejście (Transition / Rainbow)
++        MODE_FLASHING_STARS       = 0x87,   // Błyskające gwiazdy (Flashing Stars)
++        MODE_WATER_DROP           = 0x88,   // Krople wody (Water Drop / Raindrops)
++        MODE_DOUBLE_TRANSITION    = 0x89,   // Podwójne przejście (Double Transition / Ripples)
++        MODE_SHADOW               = 0x8a,   // Cień (Shadow / Shadow Disappear)
++        MODE_SNAKE                = 0x8b,   // Wąż (Snake / Retro Snake)
++        MODE_NEON_WAVE            = 0x8c,   // Fala neonowa (Neon Wave / Neon Stream)
++        MODE_MARK                 = 0x8d,   // Znacznik (Mark / Reaction)
++        MODE_SINE_WAVE            = 0x8e,   // Fala sinusoidalna (Sine Wave)
++        MODE_SCANNING             = 0x8f,   // Skanowanie (Scanning / Retinue Scanning)
++        MODE_CAROUSEL             = 0x90,   // Karuzela (Carousel / Rotating Windmill)
++        MODE_WATERFALL            = 0x91,   // Wodospad (Waterfall / Colorful Waterfall)
++        MODE_ILLUMINATE_LINE      = 0x92,   // Podświetlenie linii (Illuminate Line / Blossoming)
++        MODE_RAIN                 = 0x93,   // Deszcz (Rain / Rotating Storm)
++        MODE_PULSING              = 0x12,   // Pulsowanie (Pulsing / Perfect)
++        MODE_COLLISION            = 0x13,   // Kolizja (collision)
++        MODE_FLASH                = 0x14,   // Błysk (Flash)
++        MODE_GAME                 = 0x15,   // Tryb gry (Game mode - per-key addressing)
++        MODE_OFF                  = 0x16,   // Wyłączone (Off)
++    };
++
++    // Speed definitions
++    enum
++    {
++        SPEED_SLOW     = 0x00,
++        SPEED_NORMAL   = 0x40,
++        SPEED_FAST     = 0x80,
++        SPEED_FASTEST  = 0xC0,
+     };
+ 
+     // TKL keyboard matrix map (6 rows x 17 columns = 102 keys possible)
+@@ -59,147 +66,20 @@ namespace gk850w
+         {113, 114, 115,  NA,  NA,  NA, 118,  NA,  NA,  NA,  NA, 121, 122, 123, 127, 128, 129}
+     };
+ 
+-    static const char *led_names_tkl[] =
+-    {
+-        KEY_EN_ESCAPE,
+-        KEY_EN_F1,
+-        KEY_EN_F2,
+-        KEY_EN_F3,
+-        KEY_EN_F4,
+-        KEY_EN_F5,
+-        KEY_EN_F6,
+-        KEY_EN_F7,
+-        KEY_EN_F8,
+-        KEY_EN_F9,
+-        KEY_EN_F10,
+-        KEY_EN_F11,
+-        KEY_EN_F12,
+-        KEY_EN_PRINT_SCREEN,
+-        KEY_EN_SCROLL_LOCK,
+-        "Key: Pause",
+-
+-        KEY_EN_BACK_TICK,
+-        KEY_EN_1,
+-        KEY_EN_2,
+-        KEY_EN_3,
+-        KEY_EN_4,
+-        KEY_EN_5,
+-        KEY_EN_6,
+-        KEY_EN_7,
+-        KEY_EN_8,
+-        KEY_EN_9,
+-        KEY_EN_0,
+-        KEY_EN_MINUS,
+-        KEY_EN_EQUALS,
+-        KEY_EN_BACKSPACE,
+-        KEY_EN_INSERT,
+-        KEY_EN_HOME,
+-        KEY_EN_PAGE_UP,
+-
+-        KEY_EN_TAB,
+-        KEY_EN_Q,
+-        KEY_EN_W,
+-        KEY_EN_E,
+-        KEY_EN_R,
+-        KEY_EN_T,
+-        KEY_EN_Y,
+-        KEY_EN_U,
+-        KEY_EN_I,
+-        KEY_EN_O,
+-        KEY_EN_P,
+-        KEY_EN_LEFT_BRACKET,
+-        KEY_EN_RIGHT_BRACKET,
+-        KEY_EN_ANSI_BACK_SLASH,
+-        KEY_EN_DELETE,
+-        KEY_EN_END,
+-        KEY_EN_PAGE_DOWN,
+-
+-        KEY_EN_CAPS_LOCK,
+-        KEY_EN_A,
+-        KEY_EN_S,
+-        KEY_EN_D,
+-        KEY_EN_F,
+-        KEY_EN_G,
+-        KEY_EN_H,
+-        KEY_EN_J,
+-        KEY_EN_K,
+-        KEY_EN_L,
+-        KEY_EN_SEMICOLON,
+-        KEY_EN_QUOTE,
+-        KEY_EN_ANSI_ENTER,
+-
+-        KEY_EN_LEFT_SHIFT,
+-        KEY_EN_Z,
+-        KEY_EN_X,
+-        KEY_EN_C,
+-        KEY_EN_V,
+-        KEY_EN_B,
+-        KEY_EN_N,
+-        KEY_EN_M,
+-        KEY_EN_COMMA,
+-        KEY_EN_PERIOD,
+-        KEY_EN_FORWARD_SLASH,
+-        KEY_EN_RIGHT_SHIFT,
+-        KEY_EN_UP_ARROW,
+-
+-        KEY_EN_LEFT_CONTROL,
+-        KEY_EN_LEFT_WINDOWS,
+-        KEY_EN_LEFT_ALT,
+-        KEY_EN_SPACE,
+-        KEY_EN_RIGHT_CONTROL,
+-        KEY_EN_RIGHT_ALT,
+-        KEY_EN_RIGHT_WINDOWS,
+-        KEY_EN_RIGHT_FUNCTION,
+-        KEY_EN_LEFT_ARROW,
+-        KEY_EN_DOWN_ARROW,
+-        KEY_EN_RIGHT_ARROW,
+-    };
+-
+-    // Speed values (from pcap analysis)
+-    enum
+-    {
+-        SPEED_SLOWEST           = 0x00,
+-        SPEED_SLOW              = 0x01,
+-        SPEED_NORMAL            = 0x02,
+-        SPEED_FAST              = 0x03,
+-        SPEED_FASTEST           = 0x04,
+-    };
+-
+-    // Brightness values (from pcap analysis)
+-    enum
++    class SinowealthGK850WController
+     {
+-        BRIGHTNESS_OFF          = 0x00,
+-        BRIGHTNESS_QUARTER      = 0x01,
+-        BRIGHTNESS_HALF         = 0x02,
+-        BRIGHTNESS_THREE_QUARTERS = 0x03,
+-        BRIGHTNESS_FULL         = 0x04,
++        public:
++            SinowealthGK850WController(hid_device* dev_ptr, const char* path, const std::string& dev_name);
++            ~SinowealthGK850WController();
++
++            const std::string GetNameString();
++            const std::string GetSerialString();
++            const std::string GetDeviceLocation();
++            void SetMode(unsigned int mode_value, unsigned char speed, unsigned char brightness);
++            void SetLEDsDirect(std::vector<RGBColor> colors);
++
++        private:
++            hid_device* dev;
++            std::string name;
+     };
+ }
+-
+-class SinowealthGK850WController
+-{
+-public:
+-    SinowealthGK850WController(hid_device* dev_handle, const char* path, std::string dev_name);
+-    ~SinowealthGK850WController();
+-
+-    std::string     GetDeviceLocation();
+-    std::string     GetNameString();
+-    std::string     GetSerialString();
+-
+-    void            SetMode
+-                        (
+-                        unsigned char mode          = gk850w::MODE_STATIC,
+-                        unsigned char brightness    = gk850w::BRIGHTNESS_FULL,
+-                        unsigned char speed         = gk850w::SPEED_NORMAL
+-                        );
+-
+-    void            SetLEDsDirect(std::vector<RGBColor>& colors);
+-
+-private:
+-    hid_device*     dev;
+-    std::string     name;
+-    std::string     location;
+-
+-    void            SendFeatureReport5(unsigned char cmd, unsigned char arg1, unsigned char arg2 = 0x00, unsigned char arg3 = 0x00, unsigned char arg4 = 0x00, unsigned char arg5 = 0x00);
+-    void            SendFeatureReport6(const unsigned char* data, int len);
+-};
