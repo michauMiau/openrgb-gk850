@@ -61,7 +61,6 @@ private:
     OpenRGBPluginAPIInterface* api = nullptr;
     hid_device* dev_handle = nullptr;
     
-    // State for sound reactive mode
     std::vector<RGBColor> leds;
     unsigned int current_mode = MODE_OFF;
     RGBControllerInterface* virtual_controller = nullptr;

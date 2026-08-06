@@ -14,9 +14,12 @@
 #include <QComboBox>
 #include "LogManager.h"
 
-// Number of LEDs per zone — adjust to match your keyboard layout
-// NO, A 60% KEYBOARD DOESN'T FUCKING HAVE 96 KEYS YOU DUMB FUCK
-constexpr int NUM_LEDS = 61; // Adjust for your layout (87/96/104)
+static constexpr int REPORT_SIZE    = 1032;
+static constexpr int HEADER_SIZE    = 1;   // Report ID byte
+static constexpr int BYTES_PER_LED  = 3;   // RGB
+static constexpr int MAX_LEDS       = (REPORT_SIZE - HEADER_SIZE) / BYTES_PER_LED; // 343
+constexpr int NUM_LEDS              = 61; // Actual keyboard key count
+static constexpr unsigned char DEFAULT_BRIGHTNESS = 0x83; // Brightness byte in mode command reports (Report ID 5)
 
 void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
     api = plugin_api_ptr;
@@ -95,42 +98,44 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
         auto* self = (OpenGK850WPlugin*)arg;
         if (!self->dev_handle) return;
 
-        if (self->current_mode == MODE_GAME || self->current_mode == 1) {
+        if (self->current_mode == MODE_GAME) {
             // Custom mode - send per-key LED data (Report ID 6)
-            unsigned char report[1032] = {0x06};
-            for (int i = 0; i < NUM_LEDS && i < (int)self->leds.size(); i++) {
+            unsigned char report[REPORT_SIZE] = {0x06};
+            int leds_to_send = std::min(NUM_LEDS, (int)self->leds.size());
+            for (int i = 0; i < leds_to_send && i < MAX_LEDS; i++) {
                 RGBColor c = self->leds[i];
-                report[i * 3 + 1] = c & 0xFF;
-                report[i * 3 + 2] = (c >> 8) & 0xFF;
-                report[i * 3 + 3] = (c >> 16) & 0xFF;
+                report[i * BYTES_PER_LED + 1] = c & 0xFF;
+                report[i * BYTES_PER_LED + 2] = (c >> 8) & 0xFF;
+                report[i * BYTES_PER_LED + 3] = (c >> 16) & 0xFF;
             }
-            hid_send_feature_report(self->dev_handle, report, 1032);
+            hid_send_feature_report(self->dev_handle, report, HEADER_SIZE + leds_to_send * BYTES_PER_LED);
         } else {
             // Built-in mode - send mode command (Report ID 5)
-            unsigned char report[6] = {0x05, (unsigned char)self->current_mode, 0x83, 0x00, 0x00, 0x00};
+            unsigned char report[6] = {0x05, (unsigned char)self->current_mode, DEFAULT_BRIGHTNESS, 0x00, 0x00, 0x00};
             hid_send_feature_report(self->dev_handle, report, 6);
         }
     };
 
     setup.DeviceUpdateSingleLED = [](void* arg, int led_idx) {
         auto* self = (OpenGK850WPlugin*)arg;
-        if (!self->dev_handle || self->current_mode != MODE_GAME && self->current_mode != 1) return;
+        if (!self->dev_handle || self->current_mode != MODE_GAME) return;
 
-        unsigned char report[1032] = {0x06};
-        for (int i = 0; i < NUM_LEDS && i < (int)self->leds.size(); i++) {
+        unsigned char report[REPORT_SIZE] = {0x06};
+        int leds_to_send = std::min(NUM_LEDS, (int)self->leds.size());
+        for (int i = 0; i < leds_to_send && i < MAX_LEDS; i++) {
             RGBColor c = self->leds[i];
-            report[i * 3 + 1] = c & 0xFF;
-            report[i * 3 + 2] = (c >> 8) & 0xFF;
-            report[i * 3 + 3] = (c >> 16) & 0xFF;
+            report[i * BYTES_PER_LED + 1] = c & 0xFF;
+            report[i * BYTES_PER_LED + 2] = (c >> 8) & 0xFF;
+            report[i * BYTES_PER_LED + 3] = (c >> 16) & 0xFF;
         }
-        hid_send_feature_report(self->dev_handle, report, 1032);
+        hid_send_feature_report(self->dev_handle, report, HEADER_SIZE + leds_to_send * BYTES_PER_LED);
     };
 
     setup.DeviceUpdateMode = [](void* arg) {
         auto* self = (OpenGK850WPlugin*)arg;
         if (!self->dev_handle) return;
 
-        unsigned char report[6] = {0x05, (unsigned char)self->current_mode, 0x83, 0x00, 0x00, 0x00};
+        unsigned char report[6] = {0x05, (unsigned char)self->current_mode, DEFAULT_BRIGHTNESS, 0x00, 0x00, 0x00};
         hid_send_feature_report(self->dev_handle, report, 6);
     };
 
@@ -171,9 +176,11 @@ QWidget* OpenGK850WPlugin::GetWidget() {
             virtual_controller->SetActiveMode(idx);
         }
 
-        // Send command to device
-        unsigned char report[6] = {0x05, (unsigned char)current_mode, 0x83, 0x00, 0x00, 0x00};
-        hid_send_feature_report(dev_handle, report, 6);
+        // Send command to device (guarded by null check)
+        if (dev_handle) {
+            unsigned char report[6] = {0x05, (unsigned char)current_mode, DEFAULT_BRIGHTNESS, 0x00, 0x00, 0x00};
+            hid_send_feature_report(dev_handle, report, 6);
+        }
 
         status_label->setText(QString("Mode: %1").arg(mode_combo->currentText()));
     });
