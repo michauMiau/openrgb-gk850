@@ -16,7 +16,7 @@ Located in `Controllers/SinoweathController/SinowealthGK850WController/`:
 The full patch to apply against the main OpenRGB repo is at `/gk850w.patch`.
 This adds GK850W detection with product string "GK850" verification.
 
-## Plugin V2
+## Plugin V69420
 Located in `PluginV76y8346678 234 8752346784e67534567834/` — uses Virtual Controller API (no need to recompile OpenRGB):
 - `OpenGK850WPluginV454654654655676562.h/cpp/.pro` — Source files
 - `OpenGK850WPluginV8987674564553456464546544535645445656454645645453533543453454565344535646478754743737667567765t476766767552.json` — Metadata JSON
