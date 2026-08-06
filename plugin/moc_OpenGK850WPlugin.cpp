@@ -33,19 +33,19 @@ QT_WARNING_PUSH
 QT_WARNING_DISABLE_DEPRECATED
 QT_WARNING_DISABLE_GCC("-Wuseless-cast")
 namespace {
-struct qt_meta_tag_ZN18OpenGK850WPluginE_t {};
+struct qt_meta_tag_ZN16OpenGK850WPluginE_t {};
 } // unnamed namespace
 
 
 #ifdef QT_MOC_HAS_STRINGDATA
-static constexpr auto qt_meta_stringdata_ZN18OpenGK850WPluginE = QtMocHelpers::stringData(
+static constexpr auto qt_meta_stringdata_ZN16OpenGK850WPluginE = QtMocHelpers::stringData(
     "OpenGK850WPlugin"
 );
 #else  // !QT_MOC_HAS_STRINGDATA
 #error "qtmochelpers.h not found or too old."
 #endif // !QT_MOC_HAS_STRINGDATA
 
-Q_CONSTINIT static const uint qt_meta_data_ZN18OpenGK850WPluginE[] = {
+Q_CONSTINIT static const uint qt_meta_data_ZN16OpenGK850WPluginE[] = {
 
  // content:
       12,       // revision
@@ -63,11 +63,11 @@ Q_CONSTINIT static const uint qt_meta_data_ZN18OpenGK850WPluginE[] = {
 
 Q_CONSTINIT const QMetaObject OpenGK850WPlugin::staticMetaObject = { {
     QMetaObject::SuperData::link<QObject::staticMetaObject>(),
-    qt_meta_stringdata_ZN18OpenGK850WPluginE.offsetsAndSizes,
-    qt_meta_data_ZN18OpenGK850WPluginE,
+    qt_meta_stringdata_ZN16OpenGK850WPluginE.offsetsAndSizes,
+    qt_meta_data_ZN16OpenGK850WPluginE,
     qt_static_metacall,
     nullptr,
-    qt_incomplete_metaTypeArray<qt_meta_tag_ZN18OpenGK850WPluginE_t,
+    qt_incomplete_metaTypeArray<qt_meta_tag_ZN16OpenGK850WPluginE_t,
         // Q_OBJECT / Q_GADGET
         QtPrivate::TypeAndForceComplete<OpenGK850WPlugin, std::true_type>
     >,
@@ -91,7 +91,7 @@ const QMetaObject *OpenGK850WPlugin::metaObject() const
 void *OpenGK850WPlugin::qt_metacast(const char *_clname)
 {
     if (!_clname) return nullptr;
-    if (!strcmp(_clname, qt_meta_stringdata_ZN18OpenGK850WPluginE.stringdata0))
+    if (!strcmp(_clname, qt_meta_stringdata_ZN16OpenGK850WPluginE.stringdata0))
         return static_cast<void*>(this);
     if (!strcmp(_clname, "OpenRGBPluginInterface"))
         return static_cast< OpenRGBPluginInterface*>(this);
@@ -106,8 +106,8 @@ int OpenGK850WPlugin::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
     return _id;
 }
 
-#ifdef QT_MOC_EXPORT_PLUGIN_
-static constexpr unsigned char qt_pluginMetaData_OpenGK850WPlugin[] = {
+#ifdef QT_MOC_EXPORT_PLUGIN_V2
+static constexpr unsigned char qt_pluginMetaDataV2_OpenGK850WPlugin[] = {
     0xbf, 
     // "IID"
     0x02,  0x78,  0x22,  'o',  'r',  'g',  '.',  'o', 
@@ -116,39 +116,43 @@ static constexpr unsigned char qt_pluginMetaData_OpenGK850WPlugin[] = {
     'u',  'g',  'i',  'n',  'I',  'n',  't',  'e', 
     'r',  'f',  'a',  'c',  'e', 
     // "className"
-    0x03,  0x72,  'O',  'p',  'e',  'n',  'G',  'K', 
+    0x03,  0x70,  'O',  'p',  'e',  'n',  'G',  'K', 
     '8',  '5',  '0',  'W',  'P',  'l',  'u',  'g', 
-    'i',  'n',  'V',  '2', 
+    'i',  'n', 
     // "MetaData"
     0x04,  0xa7,  0x66,  'C',  'o',  'm',  'm',  'i', 
     't',  0x60,  0x6b,  'D',  'e',  's',  'c',  'r', 
-    'i',  'p',  't',  'i',  'o',  'n',  0x78,  0x49, 
-    'V',  'i',  'r',  't',  'u',  'a',  'l',  ' ', 
-    'c',  'o',  'n',  't',  'r',  'o',  'l',  'l', 
-    'e',  'r',  ' ',  'p',  'l',  'u',  'g',  'i', 
-    'n',  ' ',  'f',  'o',  'r',  ' ',  'G',  'K', 
-    '8',  '5',  '0',  'W',  ' ',  'k',  'e',  'y', 
-    'b',  'o',  'a',  'r',  'd',  ' ',  'w',  'i', 
-    't',  'h',  ' ',  's',  'o',  'u',  'n',  'd', 
-    ' ',  'r',  'e',  'a',  'c',  't',  'i',  'v', 
-    'e',  ' ',  'e',  'f',  'f',  'e',  'c',  't', 
-    's',  0x62,  'I',  'd',  0x72,  'O',  'p',  'e', 
-    'n',  'G',  'K',  '8',  '5',  '0',  'W',  'P', 
-    'l',  'u',  'g',  'i',  'n',  'V',  '2',  0x64, 
-    'N',  'a',  'm',  'e',  0x78,  0x20,  'G',  'K', 
-    '8',  '5',  '0',  'W',  ' ',  'V',  'i',  'r', 
-    't',  'u',  'a',  'l',  ' ',  'C',  'o',  'n', 
-    't',  'r',  'o',  'l',  'l',  'e',  'r',  ' ', 
-    'P',  'l',  'u',  'g',  'i',  'n',  0x77,  'O', 
-    'p',  'e',  'n',  'R',  'G',  'B',  'P',  'l', 
-    'u',  'g',  'i',  'n',  'A',  'P',  'I',  'V', 
-    'e',  'r',  's',  'i',  'o',  'n',  0x05,  0x63, 
-    'U',  'r',  'l',  0x60,  0x6a,  'V',  'e',  'r', 
-    's',  'i',  'o',  'n',  'S',  't',  'r',  0x65, 
-    '2',  '.',  '0',  '.',  '0', 
+    'i',  'p',  't',  'i',  'o',  'n',  0x78,  0x3d, 
+    'P',  'l',  'u',  'g',  'i',  'n',  ' ',  'i', 
+    'm',  'p',  'l',  'e',  'm',  'e',  'n',  't', 
+    'i',  'n',  'g',  ' ',  's',  'u',  'p',  'p', 
+    'o',  'r',  't',  ' ',  'f',  'o',  'r',  ' ', 
+    't',  'h',  'e',  ' ',  'B',  'Y',  ' ',  'T', 
+    'e',  'c',  'h',  '/',  'M',  'a',  'd',  ' ', 
+    'D',  'o',  'g',  ' ',  'G',  'K',  '8',  '5', 
+    '0',  '(',  'W',  ')',  ' ',  0x62,  'I',  'd', 
+    0x70,  'O',  'p',  'e',  'n',  'G',  'K',  '8', 
+    '5',  '0',  'W',  'P',  'l',  'u',  'g',  'i', 
+    'n',  0x64,  'N',  'a',  'm',  'e',  0x78,  0x20, 
+    'G',  'K',  '8',  '5',  '0',  'W',  ' ',  'V', 
+    'i',  'r',  't',  'u',  'a',  'l',  ' ',  'C', 
+    'o',  'n',  't',  'r',  'o',  'l',  'l',  'e', 
+    'r',  ' ',  'P',  'l',  'u',  'g',  'i',  'n', 
+    0x77,  'O',  'p',  'e',  'n',  'R',  'G',  'B', 
+    'P',  'l',  'u',  'g',  'i',  'n',  'A',  'P', 
+    'I',  'V',  'e',  'r',  's',  'i',  'o',  'n', 
+    0x05,  0x63,  'U',  'r',  'l',  0x78,  0x2b,  'h', 
+    't',  't',  'p',  's',  ':',  '/',  '/',  'g', 
+    'i',  't',  'h',  'u',  'b',  '.',  'c',  'o', 
+    'm',  '/',  'm',  'i',  'c',  'h',  'a',  'u', 
+    'M',  'i',  'a',  'u',  '/',  'o',  'p',  'e', 
+    'n',  'r',  'g',  'b',  '-',  'g',  'k',  '8', 
+    '5',  '0',  0x6a,  'V',  'e',  'r',  's',  'i', 
+    'o',  'n',  'S',  't',  'r',  0x65,  '2',  '.', 
+    '0',  '.',  '0', 
     0xff, 
 };
-QT_MOC_EXPORT_PLUGIN_(OpenGK850WPlugin, OpenGK850WPlugin, qt_pluginMetaData_OpenGK850WPlugin)
+QT_MOC_EXPORT_PLUGIN_V2(OpenGK850WPlugin, OpenGK850WPlugin, qt_pluginMetaDataV2_OpenGK850WPlugin)
 #else
 QT_PLUGIN_METADATA_SECTION
 Q_CONSTINIT static constexpr unsigned char qt_pluginMetaData_OpenGK850WPlugin[] = {
@@ -163,39 +167,43 @@ Q_CONSTINIT static constexpr unsigned char qt_pluginMetaData_OpenGK850WPlugin[] 
     'u',  'g',  'i',  'n',  'I',  'n',  't',  'e', 
     'r',  'f',  'a',  'c',  'e', 
     // "className"
-    0x03,  0x72,  'O',  'p',  'e',  'n',  'G',  'K', 
+    0x03,  0x70,  'O',  'p',  'e',  'n',  'G',  'K', 
     '8',  '5',  '0',  'W',  'P',  'l',  'u',  'g', 
-    'i',  'n',  'V',  '2', 
+    'i',  'n', 
     // "MetaData"
     0x04,  0xa7,  0x66,  'C',  'o',  'm',  'm',  'i', 
     't',  0x60,  0x6b,  'D',  'e',  's',  'c',  'r', 
-    'i',  'p',  't',  'i',  'o',  'n',  0x78,  0x49, 
-    'V',  'i',  'r',  't',  'u',  'a',  'l',  ' ', 
-    'c',  'o',  'n',  't',  'r',  'o',  'l',  'l', 
-    'e',  'r',  ' ',  'p',  'l',  'u',  'g',  'i', 
-    'n',  ' ',  'f',  'o',  'r',  ' ',  'G',  'K', 
-    '8',  '5',  '0',  'W',  ' ',  'k',  'e',  'y', 
-    'b',  'o',  'a',  'r',  'd',  ' ',  'w',  'i', 
-    't',  'h',  ' ',  's',  'o',  'u',  'n',  'd', 
-    ' ',  'r',  'e',  'a',  'c',  't',  'i',  'v', 
-    'e',  ' ',  'e',  'f',  'f',  'e',  'c',  't', 
-    's',  0x62,  'I',  'd',  0x72,  'O',  'p',  'e', 
-    'n',  'G',  'K',  '8',  '5',  '0',  'W',  'P', 
-    'l',  'u',  'g',  'i',  'n',  'V',  '2',  0x64, 
-    'N',  'a',  'm',  'e',  0x78,  0x20,  'G',  'K', 
-    '8',  '5',  '0',  'W',  ' ',  'V',  'i',  'r', 
-    't',  'u',  'a',  'l',  ' ',  'C',  'o',  'n', 
-    't',  'r',  'o',  'l',  'l',  'e',  'r',  ' ', 
-    'P',  'l',  'u',  'g',  'i',  'n',  0x77,  'O', 
-    'p',  'e',  'n',  'R',  'G',  'B',  'P',  'l', 
-    'u',  'g',  'i',  'n',  'A',  'P',  'I',  'V', 
-    'e',  'r',  's',  'i',  'o',  'n',  0x05,  0x63, 
-    'U',  'r',  'l',  0x60,  0x6a,  'V',  'e',  'r', 
-    's',  'i',  'o',  'n',  'S',  't',  'r',  0x65, 
-    '2',  '.',  '0',  '.',  '0', 
+    'i',  'p',  't',  'i',  'o',  'n',  0x78,  0x3d, 
+    'P',  'l',  'u',  'g',  'i',  'n',  ' ',  'i', 
+    'm',  'p',  'l',  'e',  'm',  'e',  'n',  't', 
+    'i',  'n',  'g',  ' ',  's',  'u',  'p',  'p', 
+    'o',  'r',  't',  ' ',  'f',  'o',  'r',  ' ', 
+    't',  'h',  'e',  ' ',  'B',  'Y',  ' ',  'T', 
+    'e',  'c',  'h',  '/',  'M',  'a',  'd',  ' ', 
+    'D',  'o',  'g',  ' ',  'G',  'K',  '8',  '5', 
+    '0',  '(',  'W',  ')',  ' ',  0x62,  'I',  'd', 
+    0x70,  'O',  'p',  'e',  'n',  'G',  'K',  '8', 
+    '5',  '0',  'W',  'P',  'l',  'u',  'g',  'i', 
+    'n',  0x64,  'N',  'a',  'm',  'e',  0x78,  0x20, 
+    'G',  'K',  '8',  '5',  '0',  'W',  ' ',  'V', 
+    'i',  'r',  't',  'u',  'a',  'l',  ' ',  'C', 
+    'o',  'n',  't',  'r',  'o',  'l',  'l',  'e', 
+    'r',  ' ',  'P',  'l',  'u',  'g',  'i',  'n', 
+    0x77,  'O',  'p',  'e',  'n',  'R',  'G',  'B', 
+    'P',  'l',  'u',  'g',  'i',  'n',  'A',  'P', 
+    'I',  'V',  'e',  'r',  's',  'i',  'o',  'n', 
+    0x05,  0x63,  'U',  'r',  'l',  0x78,  0x2b,  'h', 
+    't',  't',  'p',  's',  ':',  '/',  '/',  'g', 
+    'i',  't',  'h',  'u',  'b',  '.',  'c',  'o', 
+    'm',  '/',  'm',  'i',  'c',  'h',  'a',  'u', 
+    'M',  'i',  'a',  'u',  '/',  'o',  'p',  'e', 
+    'n',  'r',  'g',  'b',  '-',  'g',  'k',  '8', 
+    '5',  '0',  0x6a,  'V',  'e',  'r',  's',  'i', 
+    'o',  'n',  'S',  't',  'r',  0x65,  '2',  '.', 
+    '0',  '.',  '0', 
     0xff, 
 };
 QT_MOC_EXPORT_PLUGIN(OpenGK850WPlugin, OpenGK850WPlugin)
-#endif  // QT_MOC_EXPORT_PLUGIN_
+#endif  // QT_MOC_EXPORT_PLUGIN_V2
 
 QT_WARNING_POP

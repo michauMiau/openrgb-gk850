@@ -37,7 +37,7 @@ MOVE          = mv -f
 TAR           = tar -cf
 COMPRESS      = gzip -9f
 DISTNAME      = libOpenGK850WPlugin1.0.0
-DISTDIR = /tmp/openrgb-gk850-michau/plugin/.tmp/libOpenGK850WPlugin1.0.0
+DISTDIR = /tmp/ogk850-michau/plugin/.tmp/libOpenGK850WPlugin1.0.0
 LINK          = g++
 LFLAGS        = -Wl,-O1 -Wl,-rpath-link,/usr/lib/x86_64-linux-gnu -shared
 LIBS          = $(SUBLIBS) -lhidapi-hidraw /usr/lib/x86_64-linux-gnu/libQt6Widgets.so /usr/lib/x86_64-linux-gnu/libQt6Gui.so /usr/lib/x86_64-linux-gnu/libGLX.so /usr/lib/x86_64-linux-gnu/libOpenGL.so /usr/lib/x86_64-linux-gnu/libQt6Core.so -lpthread -lGLX -lOpenGL   
@@ -104,7 +104,7 @@ DIST          = /usr/lib/x86_64-linux-gnu/qt6/mkspecs/features/spec_pre.prf \
 		/usr/lib/x86_64-linux-gnu/qt6/mkspecs/features/qt_config.prf \
 		/usr/lib/x86_64-linux-gnu/qt6/mkspecs/linux-g++/qmake.conf \
 		/usr/lib/x86_64-linux-gnu/qt6/mkspecs/features/spec_post.prf \
-		../../.qmake.stash \
+		.qmake.stash \
 		/usr/lib/x86_64-linux-gnu/qt6/mkspecs/features/exclusive_builds.prf \
 		/usr/lib/x86_64-linux-gnu/qt6/mkspecs/features/toolchain.prf \
 		/usr/lib/x86_64-linux-gnu/qt6/mkspecs/features/default_pre.prf \
@@ -190,7 +190,7 @@ Makefile: OpenGK850WPlugin.pro /usr/lib/x86_64-linux-gnu/qt6/mkspecs/linux-g++/q
 		/usr/lib/x86_64-linux-gnu/qt6/mkspecs/features/qt_config.prf \
 		/usr/lib/x86_64-linux-gnu/qt6/mkspecs/linux-g++/qmake.conf \
 		/usr/lib/x86_64-linux-gnu/qt6/mkspecs/features/spec_post.prf \
-		../../.qmake.stash \
+		.qmake.stash \
 		/usr/lib/x86_64-linux-gnu/qt6/mkspecs/features/exclusive_builds.prf \
 		/usr/lib/x86_64-linux-gnu/qt6/mkspecs/features/toolchain.prf \
 		/usr/lib/x86_64-linux-gnu/qt6/mkspecs/features/default_pre.prf \
@@ -264,7 +264,7 @@ Makefile: OpenGK850WPlugin.pro /usr/lib/x86_64-linux-gnu/qt6/mkspecs/linux-g++/q
 /usr/lib/x86_64-linux-gnu/qt6/mkspecs/features/qt_config.prf:
 /usr/lib/x86_64-linux-gnu/qt6/mkspecs/linux-g++/qmake.conf:
 /usr/lib/x86_64-linux-gnu/qt6/mkspecs/features/spec_post.prf:
-../../.qmake.stash:
+.qmake.stash:
 /usr/lib/x86_64-linux-gnu/qt6/mkspecs/features/exclusive_builds.prf:
 /usr/lib/x86_64-linux-gnu/qt6/mkspecs/features/toolchain.prf:
 /usr/lib/x86_64-linux-gnu/qt6/mkspecs/features/default_pre.prf:
@@ -317,6 +317,7 @@ clean: compiler_clean
 
 distclean: clean 
 	-$(DEL_FILE) ../$(TARGET) 
+	-$(DEL_FILE) .qmake.stash
 	-$(DEL_FILE) Makefile
 
 
@@ -353,7 +354,7 @@ moc_OpenGK850WPlugin.cpp: OpenGK850WPlugin.h \
 		/home/truenas_admin/OpenRGB/RGBController/RGBControllerInterface.h \
 		moc_predefs.h \
 		/usr/lib/qt6/libexec/moc
-	/usr/lib/qt6/libexec/moc $(DEFINES) --include /tmp/openrgb-gk850-michau/plugin/moc_predefs.h -I/usr/lib/x86_64-linux-gnu/qt6/mkspecs/linux-g++ -I/tmp/openrgb-gk850-michau/plugin -I/home/truenas_admin/OpenRGB -I/home/truenas_admin/OpenRGB/RGBController -I/home/truenas_admin/OpenRGB/dependencies/json -I/usr/include/hidapi -I/usr/include/x86_64-linux-gnu/qt6 -I/usr/include/x86_64-linux-gnu/qt6/QtWidgets -I/usr/include/x86_64-linux-gnu/qt6/QtGui -I/usr/include/x86_64-linux-gnu/qt6/QtCore -I/usr/include/c++/14 -I/usr/include/x86_64-linux-gnu/c++/14 -I/usr/include/c++/14/backward -I/usr/lib/gcc/x86_64-linux-gnu/14/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include OpenGK850WPlugin.h -o moc_OpenGK850WPlugin.cpp
+	/usr/lib/qt6/libexec/moc $(DEFINES) --include /tmp/ogk850-michau/plugin/moc_predefs.h -I/usr/lib/x86_64-linux-gnu/qt6/mkspecs/linux-g++ -I/tmp/ogk850-michau/plugin -I/home/truenas_admin/OpenRGB -I/home/truenas_admin/OpenRGB/RGBController -I/home/truenas_admin/OpenRGB/dependencies/json -I/usr/include/hidapi -I/usr/include/x86_64-linux-gnu/qt6 -I/usr/include/x86_64-linux-gnu/qt6/QtWidgets -I/usr/include/x86_64-linux-gnu/qt6/QtGui -I/usr/include/x86_64-linux-gnu/qt6/QtCore -I/usr/include/c++/14 -I/usr/include/x86_64-linux-gnu/c++/14 -I/usr/include/c++/14/backward -I/usr/lib/gcc/x86_64-linux-gnu/14/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include OpenGK850WPlugin.h -o moc_OpenGK850WPlugin.cpp
 
 compiler_moc_objc_header_make_all:
 compiler_moc_objc_header_clean:
@@ -375,7 +376,8 @@ OpenGK850WPlugin.o: OpenGK850WPlugin.cpp OpenGK850WPlugin.h \
 		/home/truenas_admin/OpenRGB/OpenRGBPluginInterface.h \
 		/home/truenas_admin/OpenRGB/dependencies/json/nlohmann/json.hpp \
 		/home/truenas_admin/OpenRGB/filesystem.h \
-		/home/truenas_admin/OpenRGB/RGBController/RGBControllerInterface.h
+		/home/truenas_admin/OpenRGB/RGBController/RGBControllerInterface.h \
+		/home/truenas_admin/OpenRGB/LogManager.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o OpenGK850WPlugin.o OpenGK850WPlugin.cpp
 
 qrc_resources.o: qrc_resources.cpp 

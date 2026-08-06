@@ -7,28 +7,26 @@
 #include <QMap>
 #include <hidapi.h>
 
-// Sinowealth mode constants
-#define MODE_STATIC              0x83
-#define MODE_BREATHING           0x84
-#define MODE_TRANSITION          0x86
-#define MODE_FLASHING_STARS      0x87
-#define MODE_WATER_DROP          0x88
-#define MODE_DOUBLE_TRANSITION   0x89
-#define MODE_SHADOW              0x8a
-#define MODE_SNAKE               0x8b
-#define MODE_NEON_WAVE           0x8c
-#define MODE_MARK                0x8d
-#define MODE_SINE_WAVE           0x8e
-#define MODE_SCANNING            0x8f
-#define MODE_CAROUSEL            0x90
-#define MODE_WATERFALL           0x91
-#define MODE_ILLUMINATE_LINE     0x92
-#define MODE_RAIN                0x93
-#define MODE_PULSING             0x12
-#define MODE_COLLISION           0x13
-#define MODE_FLASH               0x14
-#define MODE_GAME                0x15   // Addressable Mode for this keyboard
-#define MODE_OFF                 0x16
+// Number of LEDs (61 for TKL layout, adjust as needed)
+static constexpr int NUM_LEDS = 61;
+
+// Device mode constants from PCAP analysis
+#define DEVICE_MODE_OFF              0x16   // Report ID 5: turn off lights
+#define DEVICE_MODE_PER_KEY          0x15   // Report ID 5: enable per-key addressing
+#define DEVICE_MODE_STATIC           0x01   // Report ID 5: static color mode
+
+// Speed constants from PCAP analysis
+#define SPEED_SLOW                   0x12
+#define SPEED_NORMAL                 0x22
+#define SPEED_FASTER                 0x32
+#define SPEED_FASTEST                0x42
+
+// Brightness levels (PCAP: 0x01-0x04 = quarter to full)
+#define BRIGHTNESS_OFF               0x00
+#define BRIGHTNESS_QUARTER           0x01
+#define BRIGHTNESS_HALF              0x02
+#define BRIGHTNESS_THREE_QUARTERS    0x03
+#define BRIGHTNESS_FULL              0x04
 
 class OpenGK850WPlugin : public QObject, public OpenRGBPluginInterface
 {
@@ -66,4 +64,4 @@ private:
     RGBControllerInterface* virtual_controller = nullptr;
 };
 
-#endif // OPENGK850WPLUGINV2_H
+#endif // OPENGK850WPLUGIN_H

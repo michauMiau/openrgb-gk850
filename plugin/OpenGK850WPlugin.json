@@ -1,9 +1,9 @@
 {
     "Id": "OpenGK850WPlugin",
     "Name": "GK850W Virtual Controller Plugin",
-    "VersionStr": "2.0.0",
+    "VersionStr": "2.1.0",
     "Url": "https://github.com/michauMiau/openrgb-gk850",
-    "Description": "Plugin implementing support for the BY Tech/Mad Dog GK850(W) ",
-    "OpenRGBPluginAPIVersion": 5,
+    "Description": "Virtual controller for BY Tech/Mad Dog GK850(W) keyboard - no main repo patch needed, compatible with OpenRGB Effects Plugin",
+    "OpenRGBPluginAPIVersion": 6,
     "Commit": ""
 }

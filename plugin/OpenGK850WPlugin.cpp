@@ -1,11 +1,11 @@
-/*-----------------------------------------*\
-||  OpenGK850WPlugin.cpp                   ||
-||                                         ||
-||  Plugin for GK850W keyboard using       ||
-||  Virtual RGB Controller API             ||
-||                                         ||
-||  garfi-kod, michaumiau 2026             ||
-\*-----------------------------------------*/
+/*-----------------------------------------*|
+|||  OpenGK850WPlugin.cpp                   ||
+|||                                         ||
+|||  Plugin for GK850W keyboard using       ||
+|||  Virtual RGB Controller API             ||
+|||                                         ||
+|||  garfi-kod, michaumiau 2026             ||
+|\*-----------------------------------------*/
 
 #include "OpenGK850WPlugin.h"
 #include <QLabel>
@@ -14,12 +14,18 @@
 #include <QComboBox>
 #include "LogManager.h"
 
-static constexpr int REPORT_SIZE    = 1032;
-static constexpr int HEADER_SIZE    = 1;   // Report ID byte
-static constexpr int BYTES_PER_LED  = 3;   // RGB
-static constexpr int MAX_LEDS       = (REPORT_SIZE - HEADER_SIZE) / BYTES_PER_LED; // 343
-constexpr int NUM_LEDS              = 61; // Actual keyboard key count
-static constexpr unsigned char DEFAULT_BRIGHTNESS = 0x83; // Brightness byte in mode command reports (Report ID 5)
+// PCAP analysis constants (from hid-pcap-analysis.md)
+static constexpr int REPORT_SIZE    = 1032;   // Total report size for Report ID 6
+static constexpr int HEADER_SIZE    = 1;      // Report ID byte
+static constexpr int MAX_LEDS       = (REPORT_SIZE - HEADER_SIZE) / 3; // 343 max LEDs
+
+// Mode constants from PCAP analysis — these are the actual device modes
+// Note: MODE_STATIC is 0x01, NOT 0x83 (which was brightness!)
+#define DEVICE_MODE_OFF              0x16   // Mode sent via Report ID 5
+#define DEVICE_MODE_PER_KEY          0x15   // Custom per-key mode
+
+// Brightness levels from PCAP analysis
+static constexpr unsigned char BRIGHTNESS_LEVELS[] = {0x01, 0x02, 0x03, 0x04}; // quarter to full
 
 void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
     api = plugin_api_ptr;
@@ -48,7 +54,7 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
         return;
     }
 
-    // Initialize LEDs — adjust NUM_LEDS for your layout (87/96/104)
+    // Initialize LEDs — adjust NUM_LEDS for your layout (61 TKL / 87 / 96 / 104)
     leds.resize(NUM_LEDS, ToRGBColor(0, 0, 0));
 
     // Create virtual controller setup
@@ -56,13 +62,13 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
     setup.name = "GK850";
     setup.vendor = "BY Tech";
     setup.description = "Sinowealth GK850W (Virtual Plugin)";
-    setup.version = "2.0.0";
+    setup.version = "2.1.0";
     setup.serial = "";
     setup.location = "";
     setup.type = DEVICE_TYPE_KEYBOARD;
     setup.flags = CONTROLLER_FLAGS_MANUALLY_CONFIGURABLE;
 
-    // Add modes — only controller modes, no sound reactive (handled by Effects Plugin)
+    // Add modes — only controller-native modes from PCAP analysis
     mode m;
 
     m.name = "Static";
@@ -94,24 +100,47 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
     setup.zones.push_back(z);
 
     // Callback for updating LEDs via HID
+    // Report ID 5 format (from PCAP): {0x05, mode, speed, brightness, 0x00, 0x00}
+    // Report ID 6 format (from PCAP): {0x06, header[4], per-key BGR data at specific offsets}
     setup.DeviceUpdateLEDs = [](void* arg) {
         auto* self = (OpenGK850WPlugin*)arg;
         if (!self->dev_handle) return;
 
         if (self->current_mode == MODE_GAME) {
-            // Custom mode - send per-key LED data (Report ID 6)
-            unsigned char report[REPORT_SIZE] = {0x06};
+            // Custom mode - send per-key LED data via Report ID 6
+            unsigned char report[REPORT_SIZE] = {0};
+            
+            // Report header from PCAP: {0x06, 0x08, 0xB8, 0x00, 0x40, ...}
+            report[0] = 0x06;  // Report ID
+            report[1] = 0x08;  // Header byte
+            report[2] = 0xB8;  // Header byte
+            report[3] = 0x00;  // Header byte
+            report[4] = 0x40;  // Header byte
+            
             int leds_to_send = std::min(NUM_LEDS, (int)self->leds.size());
+            
+            // PCAP analysis shows LED data is stored in specific layout positions
+            // Each LED takes 3 bytes: B G R (note: order matters!)
             for (int i = 0; i < leds_to_send && i < MAX_LEDS; i++) {
                 RGBColor c = self->leds[i];
-                report[i * BYTES_PER_LED + 1] = c & 0xFF;
-                report[i * BYTES_PER_LED + 2] = (c >> 8) & 0xFF;
-                report[i * BYTES_PER_LED + 3] = (c >> 16) & 0xFF;
+                // PCAP shows BGR packing, not RGB
+                report[1 + i * 3]     = RGBGetBValue(c);
+                report[1 + i * 3 + 1] = RGBGetGValue(c);
+                report[1 + i * 3 + 2] = RGBGetRValue(c);
             }
-            hid_send_feature_report(self->dev_handle, report, HEADER_SIZE + leds_to_send * BYTES_PER_LED);
+            
+            hid_send_feature_report(self->dev_handle, report, REPORT_SIZE);
         } else {
-            // Built-in mode - send mode command (Report ID 5)
-            unsigned char report[6] = {0x05, (unsigned char)self->current_mode, DEFAULT_BRIGHTNESS, 0x00, 0x00, 0x00};
+            // Built-in mode - send mode command via Report ID 5
+            // Format: {0x05, mode_value, speed, brightness, 0x00, 0x00}
+            unsigned char report[6] = {
+                0x05,                           // Report ID
+                DEVICE_MODE_PER_KEY,           // Mode (we use per-key for custom)
+                SPEED_NORMAL,                   // Speed
+                BRIGHTNESS_FULL,               // Brightness
+                0x00, 0x00                     // Padding
+            };
+            
             hid_send_feature_report(self->dev_handle, report, 6);
         }
     };
@@ -120,22 +149,51 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
         auto* self = (OpenGK850WPlugin*)arg;
         if (!self->dev_handle || self->current_mode != MODE_GAME) return;
 
-        unsigned char report[REPORT_SIZE] = {0x06};
+        unsigned char report[REPORT_SIZE] = {0};
+        
+        // Report header from PCAP
+        report[0] = 0x06;
+        report[1] = 0x08;
+        report[2] = 0xB8;
+        report[3] = 0x00;
+        report[4] = 0x40;
+        
         int leds_to_send = std::min(NUM_LEDS, (int)self->leds.size());
+        
+        // BGR order from PCAP
         for (int i = 0; i < leds_to_send && i < MAX_LEDS; i++) {
             RGBColor c = self->leds[i];
-            report[i * BYTES_PER_LED + 1] = c & 0xFF;
-            report[i * BYTES_PER_LED + 2] = (c >> 8) & 0xFF;
-            report[i * BYTES_PER_LED + 3] = (c >> 16) & 0xFF;
+            report[1 + i * 3]     = RGBGetBValue(c);
+            report[1 + i * 3 + 1] = RGBGetGValue(c);
+            report[1 + i * 3 + 2] = RGBGetRValue(c);
         }
-        hid_send_feature_report(self->dev_handle, report, HEADER_SIZE + leds_to_send * BYTES_PER_LED);
+        
+        hid_send_feature_report(self->dev_handle, report, REPORT_SIZE);
     };
 
     setup.DeviceUpdateMode = [](void* arg) {
         auto* self = (OpenGK850WPlugin*)arg;
         if (!self->dev_handle) return;
 
-        unsigned char report[6] = {0x05, (unsigned char)self->current_mode, DEFAULT_BRIGHTNESS, 0x00, 0x00, 0x00};
+        // Map OpenRGB modes to device modes from PCAP
+        unsigned char device_mode = DEVICE_MODE_PER_KEY;
+        unsigned char speed = SPEED_NORMAL;
+        unsigned char brightness = BRIGHTNESS_FULL;
+        
+        if (self->current_mode == MODE_OFF) {
+            device_mode = DEVICE_MODE_OFF;
+        } else if (self->current_mode == MODE_STATIC) {
+            device_mode = DEVICE_MODE_PER_KEY; // Static is handled via per-key
+        }
+        
+        unsigned char report[6] = {
+            0x05,                   // Report ID
+            device_mode,           // Mode
+            speed,                  // Speed
+            brightness,             // Brightness
+            0x00, 0x00              // Padding
+        };
+        
         hid_send_feature_report(self->dev_handle, report, 6);
     };
 
@@ -178,7 +236,13 @@ QWidget* OpenGK850WPlugin::GetWidget() {
 
         // Send command to device (guarded by null check)
         if (dev_handle) {
-            unsigned char report[6] = {0x05, (unsigned char)current_mode, DEFAULT_BRIGHTNESS, 0x00, 0x00, 0x00};
+            unsigned char report[6] = {
+                0x05,                           // Report ID
+                DEVICE_MODE_PER_KEY,           // Mode
+                SPEED_NORMAL,                   // Speed
+                BRIGHTNESS_FULL,               // Brightness
+                0x00, 0x00                      // Padding
+            };
             hid_send_feature_report(dev_handle, report, 6);
         }
 
@@ -218,7 +282,7 @@ OpenRGBPluginInfo OpenGK850WPlugin::GetPluginInfo() {
     OpenRGBPluginInfo info;
     info.Name = "GK850W";
     info.Description = "Virtual controller for GK850W keyboard - no main repo patch needed";
-    info.Version = "2.0.0";
+    info.Version = "2.1.0";
     info.Commit = "local-build";
     info.URL = "";
     info.Location = OPENRGB_PLUGIN_LOCATION_TOP;
