@@ -1,5 +1,5 @@
 <RCC>
     <qresource prefix="/">
-        <!-- File for resorces like fonts and images, NOT FUCKING PLUGIN METADATA -->
+        <file>OpenGK850WPlugin.json</file>
     </qresource>
 </RCC>

@@ -6,8 +6,7 @@
 ** WARNING! All changes made in this file will be lost!
 *****************************************************************************/
 
-#include "OpenGK850WPlugin.h"
-#include <QtGui/qtextcursor.h>
+#include "plugin/OpenGK850WPlugin.h"
 #include <QtCore/qmetatype.h>
 #include <QtCore/qplugin.h>
 

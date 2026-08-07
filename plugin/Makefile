@@ -335,7 +335,8 @@ compiler_rcc_make_all: qrc_resources.cpp
 compiler_rcc_clean:
 	-$(DEL_FILE) qrc_resources.cpp
 qrc_resources.cpp: resources.qrc \
-		/usr/lib/qt6/libexec/rcc
+		/usr/lib/qt6/libexec/rcc \
+		OpenGK850WPlugin.json
 	/usr/lib/qt6/libexec/rcc -name resources resources.qrc -o qrc_resources.cpp
 
 compiler_moc_predefs_make_all: moc_predefs.h
