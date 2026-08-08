@@ -37,40 +37,7 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
     dev_handle = hid_open(0x258A, 0x0049, NULL);
 
     if (!dev_handle) {
-        GK_LOG_INFO("[GK850W] Device not found via VID:PID, enumerating all devices...\n");
-
-        // Enumerate to find the actual device and its product string
-        struct hid_device_info* devs = hid_enumerate(0x258A, 0x0049);
-        if (devs) {
-            struct hid_device_info* cur_dev = devs;
-            while (cur_dev) {
-                GK_LOG_INFO("[GK850W] Found device path: %s\n", cur_dev->path ? cur_dev->path : "(null)");
-                if (cur_dev->product_string) {
-                    std::wstring wprod(cur_dev->product_string);
-                    std::string prod(wprod.begin(), wprod.end());
-                    GK_LOG_INFO("[GK850W] Product string: '%s'\n", prod.c_str());
-
-                    // Try to open by path instead
-                    if (cur_dev->path) {
-                        hid_device* path_handle = hid_open_path(cur_dev->path);
-                        if (path_handle) {
-                            GK_LOG_INFO("[GK850W] Successfully opened via path!\n");
-                            dev_handle = path_handle;
-                        } else {
-                            GK_LOG_INFO("[GK850W] Failed to open via path: %s\n", cur_dev->path);
-                        }
-                    }
-                }
-                cur_dev = cur_dev->next;
-            }
-            hid_free_enumeration(devs);
-        } else {
-            GK_LOG_INFO("[GK850W] No HID devices found at all for VID:PID 258A:0049\n");
-        }
-    }
-
-    if (!dev_handle) {
-        GK_LOG_INFO("[GK850W] Still no device detected!\n");
+        GK_LOG_INFO("[GK850W] Device not found (VID:PID 258A:0049)\n");
         leds.resize(NUM_LEDS, ToRGBColor(0, 0, 0));
         return;
     }

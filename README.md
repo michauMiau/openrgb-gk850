@@ -1,72 +1,118 @@
-# OpenRGB GK850W Plugin
+# OpenRGB GK850W Controller + Virtual Plugin
 
-Plugin implementujący wsparcie dla klawiatury BY Tech / Mad Dog GK850(W) z kontrolerem Sinowealth.
+GPL-2 License (same as upstream)
 
-## Budowanie
+## Overview
 
-### Wymagania
-- Qt 6.4.2 (AppImage compatible)
-- hidapi
-- OpenRGB headers (`~/OpenRGB/headers/OpenRGB/` i `~/OpenRGB/RGBController/`)
+This repository contains a complete solution for supporting the BY Tech / Mad Dog GK850(W) keyboard in OpenRGB:
+
+1. **GK850W Keyboard Controller** — New Sinowealth-based controller with product-string verification to distinguish from FL eSports F11
+2. **Virtual Controller Plugin** — Standalone OpenRGB plugin using Virtual Controller API (no main repo patching required)
+
+## VID/PID
+
+- **VID:PID**: `258a:0049` (Sinowealth BY916 chip)
+- **Product string**: "GK850" (distinguishes from FL eSports F11 which shares the same PID)
+- **Protocol**: Report ID 5/6 (same as existing Sinowealth keyboards)
+
+## Brick Risk Warning
+
+PID `0x0049` is shared with FL eSports F11 and Redragon devices. The original OpenRGB code disabled detection due to brick risk on Redragon hardware. Our solution:
+
+- Uses **product string "GK850"** as a safe distinguisher
+- Virtual Controller plugin approach requires **no patching** of main repo, eliminating brick risk entirely
+
+## Files
+
+### Controller (for direct integration into OpenRGB)
+
+Located in `Controllers/SinowealthController/SinowealthGK850WController/`:
+- `SinowealthGK850WController.h/cpp` — Core controller implementation
+- `RGBController_SinowealthGK850W.h/cpp` — OpenRGB RGBController wrapper
+
+### Plugin (standalone, no patching required)
+
+Located in `plugin/`:
+- `OpenGK850WPlugin.h/cpp/.pro` — Source files
+- `OpenGK850WPlugin.json` — Qt plugin metadata
+- `README.md` — This file
+
+## PCAP Analysis Reference
+
+Protocol analysis from USB HID captures (`hid-pcap-analysis.md`):
+
+### Report ID 5 (Command Packets) — 6 bytes
+Format: `{0x05, mode, speed, brightness, 0x00, 0x00}`
+
+| Mode | Value | Description |
+|------|-------|-------------|
+| Static | 0x01 | Single color static |
+| Breathing | 0x02 | Breath effect |
+| Rainbow/Transition | 0x03 | Rainbow transition |
+| Flash Away | 0x04 | Flash outward |
+| Raindrops | 0x05 | Raindrop pattern |
+| Off | 0x16 | All LEDs off |
+| Custom (per-key) | 0x15 | Addressable per-key mode |
+
+Speed values: `SLOW=0x12`, `NORMAL=0x22`, `FASTER=0x32`, `FASTEST=0x42`
+Brightness values: `OFF=0x00`, `QUARTER=0x01`, `HALF=0x02`, `THREE_QUARTERS=0x03`, `FULL=0x04`
+
+### Report ID 6 (LED Data) — 1032 bytes
+Header: `{0x06, 0x08, 0xB8, 0x00, 0x40, ...}`
+- Per-key data at specific offsets (see `tkl_keys_per_key_index` in existing controller)
+- **BGR byte order** (not RGB!) — blue, green, red channels
+
+## Building the Plugin
+
+### Prerequisites
+- Qt 6.4+ development tools (`qtbase6-dev-tools`, `qmake6`)
+- hidapi library (`libhidapi-hidraw0-dev`)
+- OpenRGB source headers (clone from gitlab.com/OpenRGBDevelopers/OpenRGB)
+
+### Build Steps
 
 ```bash
-cd plugin
-~/Qt/6.4.2/gcc_64/bin/qmake OpenGK850WPlugin.pro
-make -j1
+# Clone OpenRGB for headers
+git clone https://gitlab.com/OpenRGBDevelopers/OpenRGB.git ~/OpenRGB
+
+# Configure and build plugin
+cd plugin/
+qmake6 OpenGK850WPlugin.pro
+make -j$(nproc)
+
+# Install to OpenRGB plugins directory
+cp libOpenGK850WPlugin.so ~/.config/OpenRGB/plugins/
 ```
 
-### Uruchomienie
-Skopiuj `libOpenGK850WPlugin.so` do `~/.config/OpenRGB/plugins/`.
+### For AppImage Users (Qt 6.4.2)
 
-## Uprawnienia HID (Linux)
-
-**Uwaga:** Istniejące reguły OpenRGB (`60-openrgb.rules`) pokrywają tylko PID `258a:010c` dla klawiatur Sinowealth, ale nasz GK850W ma PID `258a:0049` — wymaga dodatkowej reguły.
-
-### Opcja 1: Reguła udev (zalecane)
-
-Dodaj plik `/etc/udev/rules.d/99-gk850w-plugin.rules`:
+The official OpenRGB pipeline AppImage bundles Qt 6.4.2. To avoid version mismatch:
 
 ```bash
-echo 'SUBSYSTEMS=="usb|hidraw", ATTRS{idVendor}=="258a", ATTRS{idProduct}=="0049", TAG+="uaccess"' | sudo tee /etc/udev/rules.d/99-gk850w-plugin.rules
+# Extract AppImage Qt libs (if needed)
+unsquashfs -d /tmp/appimg_extract OpenRGB-x86_64.AppImage
 
-sudo udevadm control --reload-rules
-sudo udevadm trigger
+# Set RPATH to AppImage Qt directory
+patchelf --set-rpath '/tmp/appimg_extract/usr/lib:$ORIGIN' libOpenGK850WPlugin.so
 ```
 
-Dodaj użytkownika do grupy plugdev:
-```bash
-sudo usermod -aG plugdev $USER
-# Wyloguj się i zaloguj ponownie (lub: sg plugdev bash)
-```
+## Usage
 
-### Opcja 2: Tymczasowe uprawnienia
+1. Copy `libOpenGK850WPlugin.so` to `~/.config/OpenRGB/plugins/`
+2. Launch OpenRGB (AppImage or compiled version)
+3. Plugin will auto-detect GK850W keyboard via VID:PID + product string verification
+4. Virtual controller appears in device list — use as any other RGB controller
+5. **Effects Plugin is fully compatible** — all standard lighting effects work
 
-Jeśli nie chcesz modyfikować reguł systemowych, możesz tymczasowo zmienić uprawnienia:
-```bash
-sudo chmod 666 /dev/hidraw*
-```
+## Compatibility Notes
 
-**Uwaga:** To wymaga powtórzenia po każdym ponownym podłączeniu urządzenia.
+- ✅ OpenRGB Effects Plugin works (virtual controllers expose standard LED arrays)
+- ✅ No main repo patching required
+- ✅ Safe for GK850W only (product string check prevents brick risk on other devices)
+- ⚠️ Requires root/hidraw access to keyboard device (install udev rules from https://openrgb.org/udev)
 
-## Troubleshooting
+## Author
 
-Jeśli plugin wyświetla "Failed to open via path: ... Brak dostępu":
-1. Sprawdź czy użytkownik należy do grupy plugdev: `groups $USER`
-2. Sprawdź czy istnieją pliki `/dev/hidraw*`: `ls -la /dev/hidraw*`
-3. Upewnij się że reguła udev jest aktywna: `udevadm info /dev/hidrawX | grep TAG`
-4. Sprawdź czy nie ma konfliktu z innym oprogramowaniem (Razer Synapse, etc.)
+garfi-kod, michaumiau 2026
 
-## Troubleshooting — "Unknown error" przy ładowaniu pluginu
-
-Jeśli OpenRGB pokazuje "Unknown error" zamiast wczytać plugin:
-- Upewnij się że używasz Qt 6.4.2 (AppImage zawiera tę wersję)
-- Sprawdź czy plugin jest skompilowany z poprawnym qmake: `~/Qt/6.4.2/gcc_64/bin/qmake`
-- Spróbuj uruchomić OpenRGB z `--verbose` aby zobaczyć szczegółowy błąd
-
-## Urządzenie
-- VID:PID: `258A:0049`
-- Product string: "GK850"
-- Report size: 1032 bajty (Report ID 6)
-
-## Repozytorium OpenRGB
-https://gitlab.com/CalcProgrammer1/OpenRGB
+Based on PCAP analysis and existing Sinowealth controller implementations in OpenRGB.
