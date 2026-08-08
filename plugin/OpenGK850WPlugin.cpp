@@ -22,9 +22,12 @@
 // Protocol constants (verified against PCAP captures + reference controller)
 //=============================================================================
 
-// Report ID 5 init command (sent once after opening the device)
-static const unsigned char INIT_CMD_1[6] = {0x05, 0x83, 0xB6, 0x00, 0x00, 0x00};
-static const unsigned char INIT_CMD_2[6] = {0x05, 0x88, 0xB8, 0x00, 0x00, 0x00};
+// Report ID 5 init command (sent once after opening the device).
+// NOTE: only ONE init command is used - the reference controller sends
+// {0x05, 0x83, 0xB6, 0x00, 0x00, 0x00}. The second packet seen in some PCAP
+// captures (05 88 B8) appears to trigger a Bluetooth/pairing mode on the
+// wireless GK850W and must NOT be sent.
+static const unsigned char INIT_CMD[6] = {0x05, 0x83, 0xB6, 0x00, 0x00, 0x00};
 
 // Mode packet template (Report ID 6, 1032 bytes) - from reference controller
 // Header: 06 03 B6 ... 5A A5 ...  mode byte at 0x15
@@ -157,12 +160,15 @@ bool OpenGK850WPlugin::OpenDevice()
 
         if(cur->usage_page != 0x01 && product_ok)
         {
-            // Open and keep the first candidate as a last resort in case the
-            // feature-report probe below fails (some Sinowealth devices only
-            // respond to RID6 after the init command is sent).
+            // Open the candidate interface.
             hid_device* handle = hid_open_path(cur->path);
             if(handle)
             {
+                // Send the init command BEFORE probing - like the reference
+                // detector does, the device only answers the RID6 feature
+                // report after receiving the init command.
+                hid_send_feature_report(handle, INIT_CMD, sizeof(INIT_CMD));
+
                 // Probe: try to read Report ID 6 feature report.
                 unsigned char buf[1032];
                 memset(buf, 0, sizeof(buf));
@@ -246,8 +252,25 @@ void OpenGK850WPlugin::RescanDevice()
 void OpenGK850WPlugin::SendInitCommands()
 {
     if(!dev_handle) return;
-    hid_send_feature_report(dev_handle, INIT_CMD_1, sizeof(INIT_CMD_1));
-    hid_send_feature_report(dev_handle, INIT_CMD_2, sizeof(INIT_CMD_2));
+    hid_send_feature_report(dev_handle, INIT_CMD, sizeof(INIT_CMD));
+}
+
+unsigned int OpenGK850WPlugin::CurrentMode()
+{
+    // Map the virtual controller's active mode index back to our MODE_* values.
+    int idx = (virtual_controller) ? virtual_controller->GetActiveMode() : -1;
+    switch(idx)
+    {
+        case 0:  return MODE_STATIC;    // Static
+        case 1:  return MODE_PER_KEY;   // Custom
+        case 2:  return MODE_OFF;       // Off
+        default: return current_mode;   // fallback to cached value
+    }
+}
+
+void OpenGK850WPlugin::SyncModeFromController()
+{
+    current_mode = CurrentMode();
 }
 
 void OpenGK850WPlugin::SendModePacket(unsigned char mode, unsigned char speed, unsigned char brightness)
@@ -421,11 +444,12 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
         auto* self = (OpenGK850WPlugin*)arg;
         if(!self->dev_handle) return;
 
-        if(self->current_mode == MODE_PER_KEY)
+        unsigned int mode = self->CurrentMode();
+        if(mode == MODE_PER_KEY)
         {
             self->SendPerKeyPacket();
         }
-        else if(self->current_mode == MODE_STATIC)
+        else if(mode == MODE_STATIC)
         {
             RGBColor c = self->leds.empty() ? ToRGBColor(0,0,0) : self->leds[0];
             self->SendStaticColorPacket(c);
@@ -435,7 +459,7 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
     setup.DeviceUpdateSingleLED = [](void* arg, int /*led_idx*/) {
         auto* self = (OpenGK850WPlugin*)arg;
         if(!self->dev_handle) return;
-        if(self->current_mode == MODE_PER_KEY)
+        if(self->CurrentMode() == MODE_PER_KEY)
         {
             self->SendPerKeyPacket();
         }
@@ -445,29 +469,31 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
         auto* self = (OpenGK850WPlugin*)arg;
         if(!self->dev_handle) return;
 
-        unsigned char device_mode;
-        switch(self->current_mode)
+        self->SyncModeFromController();
+        unsigned int mode = self->CurrentMode();
+
+        // Static color does NOT use the mode-brightness-speed packet at all in
+        // this protocol - it uses its own dedicated SetStaticColor report
+        // (06 08 B8 00 40). Sending a mode packet here triggers Bluetooth/off
+        // side effects on the GK850W chip.
+        if(mode == MODE_STATIC || mode == MODE_PER_KEY)
         {
-            case MODE_OFF:
-                device_mode = DEVICE_MODE_OFF;
-                break;
-            case MODE_STATIC:
-                device_mode = DEVICE_MODE_STATIC;
-                break;
-            case MODE_PER_KEY:
-            default:
-                device_mode = DEVICE_MODE_PER_KEY;
-                break;
+            if(mode == MODE_STATIC)
+            {
+                RGBColor c = self->leds.empty() ? ToRGBColor(0,0,0) : self->leds[0];
+                self->SendStaticColorPacket(c);
+            }
+            else
+            {
+                // Custom per-key mode: enable per-key addressing, then push colors
+                self->SendModePacket(DEVICE_MODE_PER_KEY, SPEED_NORMAL, BRIGHTNESS_FULL);
+                self->SendPerKeyPacket();
+            }
+            return;
         }
 
-        self->SendModePacket(device_mode, SPEED_NORMAL, BRIGHTNESS_FULL);
-
-        // For static, also send the color packet
-        if(self->current_mode == MODE_STATIC)
-        {
-            RGBColor c = self->leds.empty() ? ToRGBColor(0,0,0) : self->leds[0];
-            self->SendStaticColorPacket(c);
-        }
+        // Off mode
+        self->SendModePacket(DEVICE_MODE_OFF, SPEED_NORMAL, BRIGHTNESS_FULL);
     };
 
     // Register self as object pointer for callbacks

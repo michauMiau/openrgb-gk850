@@ -15,16 +15,19 @@ static constexpr int NUM_LEDS = 61;
 #define MODE_STATIC           0x01
 #define MODE_PER_KEY          0x15
 
-// Device mode values used in the mode packet (Report ID 6, byte 0x15)
-#define DEVICE_MODE_OFF              0x16   // Turn off lights
-#define DEVICE_MODE_STATIC           0x83   // Static color
+// Device mode values used in the mode packet (Report ID 6, byte 0x15).
+// NOTE: these come from the reference SinowealthKeyboardController (FL eSports
+// F11, same chip) and match the PCAP captures. The GK850W patch in this repo
+// used wrong values (0x83 static / 0x16 off) which send Bluetooth/off commands.
+#define DEVICE_MODE_OFF              0x00   // Turn off lights
+#define DEVICE_MODE_STATIC           0x01   // Static color (handled by SetStaticColor packet)
 #define DEVICE_MODE_PER_KEY          0x15   // Per-key addressing
 
-// Speed constants (byte 0x16 of mode packet)
-#define SPEED_SLOW                   0x00
-#define SPEED_NORMAL                 0x40
-#define SPEED_FAST                   0x80
-#define SPEED_FASTEST                0xC0
+// Speed constants (from reference controller)
+#define SPEED_SLOW                   0x12
+#define SPEED_NORMAL                 0x22
+#define SPEED_FAST                   0x32
+#define SPEED_FASTEST                0x42
 
 // Brightness constants
 #define BRIGHTNESS_FULL              0x04
@@ -77,6 +80,10 @@ private:
     void SendModePacket(unsigned char mode, unsigned char speed, unsigned char brightness);
     void SendStaticColorPacket(RGBColor color);
     void SendPerKeyPacket();
+
+    // Returns the currently active OpenRGB mode reading the controller
+    unsigned int CurrentMode();
+    void SyncModeFromController();
 };
 
 #endif // OPENGK850WPLUGIN_H
