@@ -1,118 +1,67 @@
-# OpenRGB GK850W Controller + Virtual Plugin
+# OpenRGB GK850W Plugin
 
-GPL-2 License (same as upstream)
+Plugin implementujący wsparcie dla klawiatury BY Tech / Mad Dog GK850(W) z kontrolerem Sinowealth.
 
-## Overview
+## Budowanie
 
-This repository contains a complete solution for supporting the BY Tech / Mad Dog GK850(W) keyboard in OpenRGB:
-
-1. **GK850W Keyboard Controller** — New Sinowealth-based controller with product-string verification to distinguish from FL eSports F11
-2. **Virtual Controller Plugin** — Standalone OpenRGB plugin using Virtual Controller API (no main repo patching required)
-
-## VID/PID
-
-- **VID:PID**: `258a:0049` (Sinowealth BY916 chip)
-- **Product string**: "GK850" (distinguishes from FL eSports F11 which shares the same PID)
-- **Protocol**: Report ID 5/6 (same as existing Sinowealth keyboards)
-
-## Brick Risk Warning
-
-PID `0x0049` is shared with FL eSports F11 and Redragon devices. The original OpenRGB code disabled detection due to brick risk on Redragon hardware. Our solution:
-
-- Uses **product string "GK850"** as a safe distinguisher
-- Virtual Controller plugin approach requires **no patching** of main repo, eliminating brick risk entirely
-
-## Files
-
-### Controller (for direct integration into OpenRGB)
-
-Located in `Controllers/SinowealthController/SinowealthGK850WController/`:
-- `SinowealthGK850WController.h/cpp` — Core controller implementation
-- `RGBController_SinowealthGK850W.h/cpp` — OpenRGB RGBController wrapper
-
-### Plugin (standalone, no patching required)
-
-Located in `plugin/`:
-- `OpenGK850WPlugin.h/cpp/.pro` — Source files
-- `OpenGK850WPlugin.json` — Qt plugin metadata
-- `README.md` — This file
-
-## PCAP Analysis Reference
-
-Protocol analysis from USB HID captures (`hid-pcap-analysis.md`):
-
-### Report ID 5 (Command Packets) — 6 bytes
-Format: `{0x05, mode, speed, brightness, 0x00, 0x00}`
-
-| Mode | Value | Description |
-|------|-------|-------------|
-| Static | 0x01 | Single color static |
-| Breathing | 0x02 | Breath effect |
-| Rainbow/Transition | 0x03 | Rainbow transition |
-| Flash Away | 0x04 | Flash outward |
-| Raindrops | 0x05 | Raindrop pattern |
-| Off | 0x16 | All LEDs off |
-| Custom (per-key) | 0x15 | Addressable per-key mode |
-
-Speed values: `SLOW=0x12`, `NORMAL=0x22`, `FASTER=0x32`, `FASTEST=0x42`
-Brightness values: `OFF=0x00`, `QUARTER=0x01`, `HALF=0x02`, `THREE_QUARTERS=0x03`, `FULL=0x04`
-
-### Report ID 6 (LED Data) — 1032 bytes
-Header: `{0x06, 0x08, 0xB8, 0x00, 0x40, ...}`
-- Per-key data at specific offsets (see `tkl_keys_per_key_index` in existing controller)
-- **BGR byte order** (not RGB!) — blue, green, red channels
-
-## Building the Plugin
-
-### Prerequisites
-- Qt 6.4+ development tools (`qtbase6-dev-tools`, `qmake6`)
-- hidapi library (`libhidapi-hidraw0-dev`)
-- OpenRGB source headers (clone from gitlab.com/OpenRGBDevelopers/OpenRGB)
-
-### Build Steps
+### Wymagania
+- Qt 6.4.2 (AppImage compatible)
+- hidapi
+- OpenRGB headers (`~/OpenRGB/headers/OpenRGB/` i `~/OpenRGB/RGBController/`)
 
 ```bash
-# Clone OpenRGB for headers
-git clone https://gitlab.com/OpenRGBDevelopers/OpenRGB.git ~/OpenRGB
-
-# Configure and build plugin
-cd plugin/
-qmake6 OpenGK850WPlugin.pro
-make -j$(nproc)
-
-# Install to OpenRGB plugins directory
-cp libOpenGK850WPlugin.so ~/.config/OpenRGB/plugins/
+cd plugin
+~/Qt/6.4.2/gcc_64/bin/qmake OpenGK850WPlugin.pro
+make -j1
 ```
 
-### For AppImage Users (Qt 6.4.2)
+### Uruchomienie
+Skopiuj `libOpenGK850WPlugin.so` do `~/.config/OpenRGB/plugins/`.
 
-The official OpenRGB pipeline AppImage bundles Qt 6.4.2. To avoid version mismatch:
+## Uprawnienia HID (Linux)
 
+Jeśli plugin nie wykrywa klawiatury z błędem "Brak dostępu", upewnij się że:
+
+1. **Masz zainstalowane domyślne reguły OpenRGB:**
+   ```bash
+   sudo apt install openrgb-client openrgb-server  # lub inny pakiet OpenRGB
+   # Lub ręcznie dodaj:
+   echo 'SUBSYSTEM=="hidraw", KERNEL=="hidraw*", ATTRS{idVendor}=="258a", MODE="0660", GROUP="plugdev"' | sudo tee /etc/udev/rules.d/99-gk850w-udev.rules
+   ```
+
+2. **Dodaj użytkownika do grupy plugdev:**
+   ```bash
+   sudo usermod -aG plugdev $USER
+   ```
+
+3. **Przeładuj reguły udev i zaloguj się ponownie:**
+   ```bash
+   sudo udevadm control --reload-rules
+   sudo udevadm trigger
+   # Wyloguj się i zaloguj ponownie (lub: sg plugdev bash)
+   ```
+
+4. **Sprawdź urządzenie:**
+   ```bash
+   ls -la /dev/hidraw* | grep -E "258a|gk"
+   ```
+
+### Alternatywnie — uruchom OpenRGB jako root (niezalecane):
 ```bash
-# Extract AppImage Qt libs (if needed)
-unsquashfs -d /tmp/appimg_extract OpenRGB-x86_64.AppImage
-
-# Set RPATH to AppImage Qt directory
-patchelf --set-rpath '/tmp/appimg_extract/usr/lib:$ORIGIN' libOpenGK850WPlugin.so
+sudo openrgb
 ```
 
-## Usage
+## Urządzenie
+- VID:PID: `258A:0049`
+- Product string: "GK850"
+- Report size: 1032 bajty (Report ID 6)
 
-1. Copy `libOpenGK850WPlugin.so` to `~/.config/OpenRGB/plugins/`
-2. Launch OpenRGB (AppImage or compiled version)
-3. Plugin will auto-detect GK850W keyboard via VID:PID + product string verification
-4. Virtual controller appears in device list — use as any other RGB controller
-5. **Effects Plugin is fully compatible** — all standard lighting effects work
+## Troubleshooting
 
-## Compatibility Notes
+Jeśli plugin wyświetla "Failed to open via path: ... Brak dostępu":
+- Sprawdź czy użytkownik należy do grupy plugdev: `groups $USER`
+- Sprawdź czy istnieją pliki `/dev/hidraw*`: `ls -la /dev/hidraw*`
+- Upewnij się że nie ma konfliktu z innym oprogramowaniem (Razer Synapse, etc.)
 
-- ✅ OpenRGB Effects Plugin works (virtual controllers expose standard LED arrays)
-- ✅ No main repo patching required
-- ✅ Safe for GK850W only (product string check prevents brick risk on other devices)
-- ⚠️ Requires root/hidraw access to keyboard device (install udev rules from https://openrgb.org/udev)
-
-## Author
-
-garfi-kod, michaumiau 2026
-
-Based on PCAP analysis and existing Sinowealth controller implementations in OpenRGB.
+## Repozytorium OpenRGB
+https://gitlab.com/CalcProgrammer1/OpenRGB
