@@ -114,56 +114,79 @@ bool OpenGK850WPlugin::OpenDevice()
 
     hid_init();
 
-    // The GK850W exposes multiple HID interfaces. The first one (boot keyboard,
-    // usage_page 0x01) is claimed by the kernel and cannot be opened. The RGB
-    // interface uses usage_page 0xFF00 (vendor-defined). Enumerate and open the
-    // correct interface via its path.
+    // The GK850W exposes multiple HID interfaces (lsusb -v shows 2: a boot
+    // keyboard + a vendor RGB interface). The reference Sinowealth detector does
+    // NOT trust usage_page alone - it probes each interface by attempting to read
+    // the Report ID 6 feature report. We do the same: enumerate all matching
+    // interfaces, log each one, and pick the interface that responds to the RGB
+    // feature report (and whose product string matches "GK850").
     struct hid_device_info* devs = hid_enumerate(0x258A, 0x0049);
     struct hid_device_info* cur  = devs;
-    hid_device*             fallback_handle = nullptr;
+    bool                    saw_any = false;
+    hid_device*             match = nullptr;
+    hid_device*             last_resort = nullptr;   // product-matched, non-boot candidate
 
     while(cur)
     {
-        bool is_rgb_iface = (cur->usage_page == 0xFF00);
+        saw_any = true;
 
-        // Blacklist the boot keyboard interface (usage_page 0x01) - it is claimed
-        // by the kernel and opening it always fails. Try the vendor interface first.
-        if(is_rgb_iface || cur->usage_page != 0x01)
+        // Read product string for identification/logging
+        std::string prod;
         {
-            // Remember a non-boot fallback in case no 0xFF00 interface exists
-            if(!is_rgb_iface && fallback_handle == nullptr)
+            hid_device* tmp = hid_open_path(cur->path);
+            if(tmp)
             {
-                fallback_handle = hid_open_path(cur->path);
-            }
-
-            hid_device* handle = is_rgb_iface ? hid_open_path(cur->path) : nullptr;
-
-            if(handle)
-            {
-                // Verify product string to avoid bricking other devices sharing this PID
                 wchar_t product[128] = {0};
-                if(hid_get_product_string(handle, product, 127) == 0)
+                if(hid_get_product_string(tmp, product, 127) == 0)
                 {
                     std::wstring wprod(product);
-                    std::string prod(wprod.begin(), wprod.end());
-                    GK_LOG_INFO("Product string: %s\n", prod.c_str());
+                    prod.assign(wprod.begin(), wprod.end());
+                }
+                hid_close(tmp);
+            }
+        }
 
-                    if(prod.find("GK850") != std::string::npos || prod.find("gk850") != std::string::npos)
-                    {
-                        dev_handle = handle;
-                        break;
-                    }
-                    else
-                    {
-                        GK_LOG_INFO("Not a GK850W device, closing to avoid brick risk\n");
-                        hid_close(handle);
-                    }
+        GK_LOG_INFO("USB iface: path=%s usage_page=0x%04X usage=0x%04X iface=%d product='%s'\n",
+                    cur->path ? cur->path : "(null)", cur->usage_page, cur->usage,
+                    cur->interface_number, prod.c_str());
+
+        // Skip the boot-keyboard interface (usage_page 0x01) - kernel-owned, never
+        // opens and never carries RGB data. Also require product string match.
+        bool product_ok = (prod.find("GK850") != std::string::npos ||
+                           prod.find("gk850") != std::string::npos);
+
+        if(cur->usage_page != 0x01 && product_ok)
+        {
+            // Open and keep the first candidate as a last resort in case the
+            // feature-report probe below fails (some Sinowealth devices only
+            // respond to RID6 after the init command is sent).
+            hid_device* handle = hid_open_path(cur->path);
+            if(handle)
+            {
+                // Probe: try to read Report ID 6 feature report.
+                unsigned char buf[1032];
+                memset(buf, 0, sizeof(buf));
+                buf[0] = 0x06;   // Report ID 6
+
+                int r = hid_get_feature_report(handle, buf, sizeof(buf));
+                if(r > 0)
+                {
+                    GK_LOG_INFO("Interface responds to RID6 feature report (len=%d) - selected.\n", r);
+                    if(last_resort) hid_close(last_resort);  // close unused candidate
+                    match = handle;
+                    break;
                 }
                 else
                 {
-                    // Couldn't read product string - use it anyway (VID:PID match)
-                    dev_handle = handle;
-                    break;
+                    GK_LOG_INFO("Interface does not respond to RID6, trying next.\n");
+                    if(last_resort == nullptr)
+                    {
+                        last_resort = handle;   // keep open as fallback
+                    }
+                    else
+                    {
+                        hid_close(handle);      // already have a candidate
+                    }
                 }
             }
         }
@@ -172,18 +195,26 @@ bool OpenGK850WPlugin::OpenDevice()
 
     hid_free_enumeration(devs);
 
-    // Fallback: use the first non-boot interface if we couldn't verify product string
-    if(!dev_handle && fallback_handle)
+    if(!saw_any)
     {
-        dev_handle = fallback_handle;
-        GK_LOG_INFO("Using fallback HID interface\n");
+        GK_LOG_INFO("No HID interfaces found for VID:PID 258A:0049 (check udev rule / permissions)\n");
     }
 
-    if(!dev_handle)
+    // If the probe didn't positively identify the interface, fall back to the
+    // product-matched non-boot candidate (still safe: product string verified).
+    if(!match && last_resort)
+    {
+        GK_LOG_INFO("Using fallback product-matched interface (no RID6 response)\n");
+        match = last_resort;
+    }
+
+    if(!match)
     {
         GK_LOG_INFO("Device not found (VID:PID 258A:0049)\n");
         return false;
     }
+
+    dev_handle = match;
 
     // Send init commands to unlock the device
     SendInitCommands();
