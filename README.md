@@ -20,48 +20,53 @@ Skopiuj `libOpenGK850WPlugin.so` do `~/.config/OpenRGB/plugins/`.
 
 ## Uprawnienia HID (Linux)
 
-Jeśli plugin nie wykrywa klawiatury z błędem "Brak dostępu", upewnij się że:
+**Uwaga:** Istniejące reguły OpenRGB (`60-openrgb.rules`) pokrywają tylko PID `258a:010c` dla klawiatur Sinowealth, ale nasz GK850W ma PID `258a:0049` — wymaga dodatkowej reguły.
 
-1. **Masz zainstalowane domyślne reguły OpenRGB:**
-   ```bash
-   sudo apt install openrgb-client openrgb-server  # lub inny pakiet OpenRGB
-   # Lub ręcznie dodaj:
-   echo 'SUBSYSTEM=="hidraw", KERNEL=="hidraw*", ATTRS{idVendor}=="258a", MODE="0660", GROUP="plugdev"' | sudo tee /etc/udev/rules.d/99-gk850w-udev.rules
-   ```
+### Opcja 1: Reguła udev (zalecane)
 
-2. **Dodaj użytkownika do grupy plugdev:**
-   ```bash
-   sudo usermod -aG plugdev $USER
-   ```
+Dodaj plik `/etc/udev/rules.d/99-gk850w-plugin.rules`:
 
-3. **Przeładuj reguły udev i zaloguj się ponownie:**
-   ```bash
-   sudo udevadm control --reload-rules
-   sudo udevadm trigger
-   # Wyloguj się i zaloguj ponownie (lub: sg plugdev bash)
-   ```
-
-4. **Sprawdź urządzenie:**
-   ```bash
-   ls -la /dev/hidraw* | grep -E "258a|gk"
-   ```
-
-### Alternatywnie — uruchom OpenRGB jako root (niezalecane):
 ```bash
-sudo openrgb
+echo 'SUBSYSTEMS=="usb|hidraw", ATTRS{idVendor}=="258a", ATTRS{idProduct}=="0049", TAG+="uaccess"' | sudo tee /etc/udev/rules.d/99-gk850w-plugin.rules
+
+sudo udevadm control --reload-rules
+sudo udevadm trigger
 ```
+
+Dodaj użytkownika do grupy plugdev:
+```bash
+sudo usermod -aG plugdev $USER
+# Wyloguj się i zaloguj ponownie (lub: sg plugdev bash)
+```
+
+### Opcja 2: Tymczasowe uprawnienia
+
+Jeśli nie chcesz modyfikować reguł systemowych, możesz tymczasowo zmienić uprawnienia:
+```bash
+sudo chmod 666 /dev/hidraw*
+```
+
+**Uwaga:** To wymaga powtórzenia po każdym ponownym podłączeniu urządzenia.
+
+## Troubleshooting
+
+Jeśli plugin wyświetla "Failed to open via path: ... Brak dostępu":
+1. Sprawdź czy użytkownik należy do grupy plugdev: `groups $USER`
+2. Sprawdź czy istnieją pliki `/dev/hidraw*`: `ls -la /dev/hidraw*`
+3. Upewnij się że reguła udev jest aktywna: `udevadm info /dev/hidrawX | grep TAG`
+4. Sprawdź czy nie ma konfliktu z innym oprogramowaniem (Razer Synapse, etc.)
+
+## Troubleshooting — "Unknown error" przy ładowaniu pluginu
+
+Jeśli OpenRGB pokazuje "Unknown error" zamiast wczytać plugin:
+- Upewnij się że używasz Qt 6.4.2 (AppImage zawiera tę wersję)
+- Sprawdź czy plugin jest skompilowany z poprawnym qmake: `~/Qt/6.4.2/gcc_64/bin/qmake`
+- Spróbuj uruchomić OpenRGB z `--verbose` aby zobaczyć szczegółowy błąd
 
 ## Urządzenie
 - VID:PID: `258A:0049`
 - Product string: "GK850"
 - Report size: 1032 bajty (Report ID 6)
-
-## Troubleshooting
-
-Jeśli plugin wyświetla "Failed to open via path: ... Brak dostępu":
-- Sprawdź czy użytkownik należy do grupy plugdev: `groups $USER`
-- Sprawdź czy istnieją pliki `/dev/hidraw*`: `ls -la /dev/hidraw*`
-- Upewnij się że nie ma konfliktu z innym oprogramowaniem (Razer Synapse, etc.)
 
 ## Repozytorium OpenRGB
 https://gitlab.com/CalcProgrammer1/OpenRGB
