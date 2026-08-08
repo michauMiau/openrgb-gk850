@@ -10,33 +10,32 @@
 // Number of LEDs (61 for TKL layout, adjust as needed)
 static constexpr int NUM_LEDS = 61;
 
-// Mode constants matching OpenRGB internal enums
+// OpenRGB mode values (match RGBController.h)
 #define MODE_OFF              0x00
 #define MODE_STATIC           0x01
-#define MODE_GAME             0x03
+#define MODE_PER_KEY          0x15
 
-// Device mode constants from PCAP analysis
-#define DEVICE_MODE_OFF              0x16   // Report ID 5: turn off lights
-#define DEVICE_MODE_PER_KEY          0x15   // Report ID 5: enable per-key addressing
-#define DEVICE_MODE_STATIC           0x01   // Report ID 5: static color mode
+// Device mode values used in the mode packet (Report ID 6, byte 0x15)
+#define DEVICE_MODE_OFF              0x16   // Turn off lights
+#define DEVICE_MODE_STATIC           0x83   // Static color
+#define DEVICE_MODE_PER_KEY          0x15   // Per-key addressing
 
-// Speed constants from PCAP analysis
-#define SPEED_SLOW                   0x12
-#define SPEED_NORMAL                 0x22
-#define SPEED_FASTER                 0x32
-#define SPEED_FASTEST                0x42
+// Speed constants (byte 0x16 of mode packet)
+#define SPEED_SLOW                   0x00
+#define SPEED_NORMAL                 0x40
+#define SPEED_FAST                   0x80
+#define SPEED_FASTEST                0xC0
 
-// Brightness levels (PCAP: 0x01-0x04 = quarter to full)
-#define BRIGHTNESS_OFF               0x00
-#define BRIGHTNESS_QUARTER           0x01
-#define BRIGHTNESS_HALF              0x02
-#define BRIGHTNESS_THREE_QUARTERS    0x03
+// Brightness constants
 #define BRIGHTNESS_FULL              0x04
+
+// Report sizes
+#define REPORT_SIZE_LED              1032   // Report ID 6 LED data
+#define REPORT_SIZE_CMD              6      // Report ID 5 init command
 
 class OpenGK850WPlugin : public QObject, public OpenRGBPluginInterface
 {
     Q_OBJECT
-    // Use FILE parameter with JSON that has TOP-LEVEL keys (like other plugins)
     Q_PLUGIN_METADATA(IID "org.openrgb.OpenRGBPluginInterface" FILE "OpenGK850WPlugin.json")
     Q_INTERFACES(OpenRGBPluginInterface)
 
@@ -60,13 +59,24 @@ public:
     void ResourceManagerUpdated(unsigned int update_reason) override;
     void SettingsManagerUpdated(unsigned int update_reason) override;
 
+    // Device management
+    bool OpenDevice();
+    void CloseDevice();
+    void RescanDevice();
+
 private:
     OpenRGBPluginAPIInterface* api = nullptr;
     hid_device* dev_handle = nullptr;
-    
+
     std::vector<RGBColor> leds;
     unsigned int current_mode = MODE_OFF;
     RGBControllerInterface* virtual_controller = nullptr;
+
+    // Protocol helpers
+    void SendInitCommands();
+    void SendModePacket(unsigned char mode, unsigned char speed, unsigned char brightness);
+    void SendStaticColorPacket(RGBColor color);
+    void SendPerKeyPacket();
 };
 
 #endif // OPENGK850WPLUGIN_H
