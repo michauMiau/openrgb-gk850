@@ -10,6 +10,11 @@
 // Number of LEDs (61 for TKL layout, adjust as needed)
 static constexpr int NUM_LEDS = 61;
 
+// Mode constants matching OpenRGB internal enums
+#define MODE_OFF              0x00
+#define MODE_STATIC           0x01
+#define MODE_GAME             0x03
+
 // Device mode constants from PCAP analysis
 #define DEVICE_MODE_OFF              0x16   // Report ID 5: turn off lights
 #define DEVICE_MODE_PER_KEY          0x15   // Report ID 5: enable per-key addressing

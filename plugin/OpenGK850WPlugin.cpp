@@ -12,7 +12,9 @@
 #include <QVBoxLayout>
 #include <QPushButton>
 #include <QComboBox>
-#include "LogManager.h"
+
+// Use fprintf for logging since LogManager is part of main OpenRGB, not a plugin library
+#define GK_LOG_INFO(...) fprintf(stderr, "[GK850W] " __VA_ARGS__)
 
 // PCAP analysis constants (from hid-pcap-analysis.md)
 static constexpr int REPORT_SIZE    = 1032;   // Total report size for Report ID 6
@@ -29,13 +31,13 @@ static constexpr unsigned char BRIGHTNESS_LEVELS[] = {0x01, 0x02, 0x03, 0x04}; /
 
 void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
     api = plugin_api_ptr;
-    LOG_INFO("[GK850W] Plugin loading...\n");
+    GK_LOG_INFO("[GK850W] Plugin loading...\n");
 
     hid_init();
     dev_handle = hid_open(0x258A, 0x0049, NULL);
 
     if (!dev_handle) {
-        LOG_INFO("[GK850W] Device not found (VID:PID 258A:0049)\n");
+        GK_LOG_INFO("[GK850W] Device not found (VID:PID 258A:0049)\n");
         leds.resize(NUM_LEDS, ToRGBColor(0, 0, 0));
         return;
     }
@@ -44,10 +46,10 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
     hid_get_product_string(dev_handle, product, 127);
     std::wstring wprod(product);
     std::string prod(wprod.begin(), wprod.end());
-    LOG_INFO("[GK850W] Product string: %s\n", prod.c_str());
+    GK_LOG_INFO("[GK850W] Product string: %s\n", prod.c_str());
 
     if (prod.find("GK850") == std::string::npos) {
-        LOG_INFO("[GK850W] Not a GK850W device\n");
+        GK_LOG_INFO("[GK850W] Not a GK850W device\n");
         hid_close(dev_handle);
         dev_handle = nullptr;
         leds.resize(NUM_LEDS, ToRGBColor(0, 0, 0));
@@ -203,9 +205,9 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr) {
     virtual_controller = api->CreateVirtualRGBController(&setup);
     if (virtual_controller) {
         api->RegisterVirtualRGBController(virtual_controller);
-        LOG_INFO("[GK850W] Virtual controller registered!\n");
+        GK_LOG_INFO("[GK850W] Virtual controller registered!\n");
     } else {
-        LOG_INFO("[GK850W] Failed to create virtual controller\n");
+        GK_LOG_INFO("[GK850W] Failed to create virtual controller\n");
     }
 }
 
