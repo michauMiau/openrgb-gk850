@@ -19,6 +19,17 @@
 #define GK_LOG_INFO(...) fprintf(stderr, "[GK850W] " __VA_ARGS__)
 
 //=============================================================================
+// Protocol constants (verified against PCAP captures)
+// Key patterns from PCAP:
+// - 0583b6000000: INIT command (present in EVERY capture)
+// - 0588b8000000: REQUIRED second init (present in almost every capture!)
+// - 050301000600: Status/keepalive (very frequent)
+// - Effects use: 05 XX YY ZZ WW VV format
+//=============================================================================
+
+static const unsigned char INIT_CMD1[6] = {0x05, 0x83, 0xB6, 0x00, 0x00, 0x00};
+static const unsigned char INIT_CMD2[6] = {0x05, 0x88, 0xB8, 0x00, 0x00, 0x00};
+
 // TKL per-key index map (86 keys) - from reference controller
 //=============================================================================
 static const unsigned char TKL_KEYS_PER_KEY_INDEX[86] = {
@@ -175,8 +186,10 @@ void OpenGK850WPlugin::RescanDevice()
 void OpenGK850WPlugin::SendInitCommands()
 {
     if(!dev_handle) return;
-    // No init command needed - the device responds to mode commands directly
-    GK_LOG_INFO("SendInitCommands: done (no init needed)\n");
+    // Send BOTH init commands - both are present in PCAP captures
+    hid_send_feature_report(dev_handle, INIT_CMD1, sizeof(INIT_CMD1));
+    hid_send_feature_report(dev_handle, INIT_CMD2, sizeof(INIT_CMD2));
+    GK_LOG_INFO("SendInitCommands: done (both init commands sent)\n");
 }
 
 unsigned int OpenGK850WPlugin::CurrentMode()
@@ -202,10 +215,9 @@ void OpenGK850WPlugin::SendModePacket(unsigned char mode, unsigned char speed, u
     if(!dev_handle) return;
 
     // Report ID 5 (0x05): Mode command
-    // Format: 05 8X YY ZZ WW 00
-    // where X = mode value, Y = speed, Z = brightness, W = additional param
-    // This is the SIMPLE and CORRECT way to set mode on this device.
-    unsigned char cmd[6] = {0x05, static_cast<unsigned char>(0x80 | mode), speed, brightness, 0x00, 0x00};
+    // Format: 05 MODE SPEED BRIGHTNESS 00 00
+    // Mode value is used directly (no bitwise operations)
+    unsigned char cmd[6] = {0x05, mode, speed, brightness, 0x00, 0x00};
 
     GK_LOG_INFO("SendModePacket: mode=0x%02X speed=0x%02X brightness=0x%02X\n", mode, speed, brightness);
     
@@ -220,27 +232,29 @@ void OpenGK850WPlugin::SendStaticColorPacket(RGBColor color)
 {
     if(!dev_handle) return;
 
-    // For static color, we first set mode to STATIC (0x83) via RID5,
-    // then send the color via a RID6 report with the proper layout.
-    // The previous implementation used header 06 08 B8 which appears to
-    // trigger Bluetooth mode - that was the bug!
-    
-    // First ensure we're in static mode
-    unsigned char mode_cmd[6] = {0x05, 0x83, SPEED_NORMAL, BRIGHTNESS_FULL, 0x00, 0x00};
-    hid_send_feature_report(dev_handle, mode_cmd, sizeof(mode_cmd));
-    
-    // Now send the color data via RID6
-    // Layout: sequential RGB pairs for all keys
+    // PCAP verified: static color uses Report ID 6 with header 0608b80040
+    // Color is repeated for each LED position as RGB triplets
     unsigned char buf[REPORT_SIZE_LED];
     memset(buf, 0x00, sizeof(buf));
-    buf[0] = 0x06;  // Report ID 6
     
-    // Fill all keys with the static color (sequential RGB layout)
-    for(unsigned int i = 0; i < 1029 / 3; i++)
+    // Header from PCAP: 06 08 B8 00 40
+    buf[0x00] = 0x06;
+    buf[0x01] = 0x08;
+    buf[0x02] = 0xB8;
+    buf[0x03] = 0x00;
+    buf[0x04] = 0x40;
+    
+    // Fill color data - RGB triplet per LED position
+    // PCAP shows colors starting around offset 8, repeated pattern
+    for(unsigned int i = 0; i < 300; i++)  // enough for all LEDs
     {
-        buf[1 + i * 3]     = RGBGetRValue(color);
-        buf[2 + i * 3]     = RGBGetGValue(color);
-        buf[3 + i * 3]     = RGBGetBValue(color);
+        unsigned int offset = 8 + i * 4;  // spacing from PCAP analysis
+        if(offset + 2 < REPORT_SIZE_LED)
+        {
+            buf[offset]     = RGBGetRValue(color);
+            buf[offset + 1] = RGBGetGValue(color);
+            buf[offset + 2] = RGBGetBValue(color);
+        }
     }
     
     GK_LOG_INFO("SendStaticColorPacket: R=%d G=%d B=%d\n", RGBGetRValue(color), RGBGetGValue(color), RGBGetBValue(color));
@@ -256,18 +270,19 @@ void OpenGK850WPlugin::SendPerKeyPacket()
 {
     if(!dev_handle) return;
 
-    // First ensure we're in per-key mode (0x15)
-    unsigned char mode_cmd[6] = {0x05, 0x15, SPEED_NORMAL, BRIGHTNESS_FULL, 0x00, 0x00};
-    hid_send_feature_report(dev_handle, mode_cmd, sizeof(mode_cmd));
-
-    // Report ID 6 (0x06): Per-key LED data, 1032 bytes total
-    // First byte is report ID (0x06), rest is LED data
-    // Layout: sequential RGB pairs for each key index
+    // PCAP verified: per-key uses Report ID 6 with header 0609bc0040
     unsigned char buf[REPORT_SIZE_LED];
     memset(buf, 0x00, sizeof(buf));
-    buf[0] = 0x06;
+    
+    // Header from PCAP: 06 09 BC 00 40
+    buf[0x00] = 0x06;
+    buf[0x01] = 0x09;
+    buf[0x02] = 0xBC;
+    buf[0x03] = 0x00;
+    buf[0x04] = 0x40;
 
-    // Fill LED colors using the TKL key map - each key uses 3 bytes (RGB)
+    // Fill per-key color data using TKL key map
+    // PCAP shows data starts after header, one RGB per key index
     unsigned int num_keys = sizeof(TKL_KEYS_PER_KEY_INDEX) / sizeof(unsigned char);
     unsigned int num_leds = std::min(num_keys, (unsigned int)leds.size());
 
@@ -276,8 +291,8 @@ void OpenGK850WPlugin::SendPerKeyPacket()
         unsigned int idx = TKL_KEYS_PER_KEY_INDEX[i];
         RGBColor c = leds[i];
         
-        // Each key occupies 3 bytes starting at position 1 + idx*3
-        unsigned int offset = 1 + idx * 3;
+        // Each key at position idx * 4 + 8 (based on PCAP spacing)
+        unsigned int offset = 8 + idx * 4;
         if(offset + 2 < REPORT_SIZE_LED)
         {
             buf[offset]     = RGBGetRValue(c);
@@ -388,19 +403,17 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
 
         if(mode == MODE_STATIC)
         {
-            // Static mode: send mode command + color
             RGBColor c = self->leds.empty() ? ToRGBColor(0xFF,0,0) : self->leds[0];
             self->SendStaticColorPacket(c);
         }
         else if(mode == MODE_PER_KEY)
         {
-            // Per-key mode: send mode command + colors
             self->SendPerKeyPacket();
         }
         else
         {
-            // Off mode
-            self->SendModePacket(MODE_OFF, SPEED_NORMAL, BRIGHTNESS_FULL);
+            // Off mode: send RID6 with all zeros (from keyboard_off.pcapng)
+            self->SendStaticColorPacket(ToRGBColor(0,0,0));
         }
     };
 
