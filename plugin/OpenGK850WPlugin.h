@@ -7,8 +7,8 @@
 #include <QMap>
 #include <hidapi.h>
 
-// Number of LEDs (86 for TKL layout - matches reference controller key map)
-static constexpr int NUM_LEDS = 86;
+// Number of LEDs (61 for 60% layout - GK850W is a 60% keyboard)
+static constexpr int NUM_LEDS = 61;
 
 // Mode values (from reference Sinowealth GK850W controller header).
 // These are the ACTUAL mode values used in Report ID 5 commands.
