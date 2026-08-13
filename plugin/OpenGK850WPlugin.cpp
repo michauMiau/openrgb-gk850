@@ -19,43 +19,8 @@
 #define GK_LOG_INFO(...) fprintf(stderr, "[GK850W] " __VA_ARGS__)
 
 //=============================================================================
-// Protocol constants (verified against PCAP captures + reference controller)
-//=============================================================================
-
-// Report ID 5 init command (sent once after opening the device).
-// NOTE: only ONE init command is used - the reference controller sends
-// {0x05, 0x83, 0xB6, 0x00, 0x00, 0x00}. The second packet seen in some PCAP
-// captures (05 88 B8) appears to trigger a Bluetooth/pairing mode on the
-// wireless GK850W and must NOT be sent.
-static const unsigned char INIT_CMD[6] = {0x05, 0x83, 0xB6, 0x00, 0x00, 0x00};
-
-// Mode packet template (Report ID 6, 1032 bytes) - from reference controller
-// Header: 06 03 B6 ... 5A A5 ...  mode byte at 0x15
-static const unsigned char MODE_PACKET_TEMPLATE[1032] = {
-    0x06, 0x03, 0xB6, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x5A, 0xA5, 0x03, 0x03, 0x00, 0x00, 0x00, 0x02, 0x20, 0x01, 0x00, 0x00, 0x00, 0x00,
-    0x55, 0x55, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x20, 0x00, 0x44, 0x07, 0x30,
-    0x07, 0x23, 0x00, 0x23, 0x00, 0x23, 0x07, 0x33, 0x07, 0x23, 0x07, 0x23, 0x07, 0x23, 0x07, 0x23,
-    0x07, 0x23, 0x07, 0x23, 0x07, 0x23, 0x07, 0x23, 0x07, 0x23, 0x07, 0x23, 0x07, 0x23, 0x07, 0x23,
-    0x07, 0x23, 0x00, 0x10, 0x00, 0x10, 0x07, 0x44, 0x07, 0x44, 0x07, 0x44, 0x07, 0x44, 0x07, 0x44,
-    0x07, 0x44, 0x07, 0x44, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5A, 0xA5, 0x03, 0x03
-};
-
-// Per-key command part (placed at 0x027C in the per-key packet)
-static const unsigned char PER_KEY_CMD_PART[128] = {
-    0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF,
-    0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0xFF, 0xFF, 0xFF, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0x00,
-    0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-};
-
 // TKL per-key index map (86 keys) - from reference controller
+//=============================================================================
 static const unsigned char TKL_KEYS_PER_KEY_INDEX[86] = {
     0x08, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
     0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x1d, 0x1E, 0x1F,
@@ -65,43 +30,6 @@ static const unsigned char TKL_KEYS_PER_KEY_INDEX[86] = {
     0x50, 0x51, 0x52, 0x54, 0x5D, 0x5f,
     0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x6A, 0x6B,
     0x71, 0x72, 0x73, 0x76, 0x79, 0x7A, 0x7B, 0x7F, 0x80, 0x81
-};
-
-// Static color key indices (set to 0xFF in static color packet) - 263 entries
-static const unsigned int STATIC_KEY_INDICES[263] = {
-    0x0022, 0x0024, 0x0026, 0x0027, 0x0029, 0x002B, 0x002D, 0x002E,
-    0x002F, 0x0030, 0x0031, 0x0032, 0x0037, 0x0039, 0x003B, 0x003C,
-    0x003E, 0x0040, 0x0042, 0x0043, 0x0044, 0x0045, 0x0046, 0x0047,
-    0x004C, 0x004E, 0x0050, 0x0051, 0x0053, 0x0055, 0x0057, 0x0058,
-    0x0059, 0x005A, 0x005B, 0x005C, 0x0061, 0x0063, 0x0065, 0x0066,
-    0x0068, 0x006A, 0x006C, 0x006D, 0x006E, 0x006F, 0x0070, 0x0071,
-    0x0076, 0x0078, 0x007A, 0x007B, 0x007D, 0x007F, 0x0081, 0x0082,
-    0x0083, 0x0084, 0x0085, 0x0086, 0x008B, 0x008D, 0x008F, 0x0090,
-    0x0092, 0x0094, 0x0096, 0x0097, 0x0098, 0x0099, 0x009A, 0x009B,
-    0x00A0, 0x00A2, 0x00A4, 0x00A5, 0x00A7, 0x00A9, 0x00AB, 0x00AC,
-    0x00AD, 0x00AE, 0x00AF, 0x00B0, 0x00B5, 0x00B7, 0x00B9, 0x00BA,
-    0x00BC, 0x00BE, 0x00C0, 0x00E1, 0x00C2, 0x00C3, 0x00C4, 0x00C5,
-    0x00CA, 0x00CC, 0x00CE, 0x00CF, 0x00D1, 0x00D3, 0x00D5, 0x00D6,
-    0x00D7, 0x00D8, 0x00D9, 0x00DA, 0x00DF, 0x00E1, 0x00E3, 0x00E4,
-    0x00E6, 0x00E8, 0x00EA, 0x00EB, 0x00EC, 0x00ED, 0x00EE, 0x00EF,
-    0x00F4, 0x00F6, 0x00F8, 0x00F9, 0x00FB, 0x00FD, 0x00FF, 0x0100,
-    0x0101, 0x0102, 0x0103, 0x0104, 0x0109, 0x010B, 0x010D, 0x010E,
-    0x0110, 0x0112, 0x0114, 0x0115, 0x0116, 0x0117, 0x0118, 0x0119,
-    0x011E, 0x0120, 0x0122, 0x0123, 0x0125, 0x0127, 0x0129, 0x012A,
-    0x012B, 0x012C, 0x012D, 0x012E, 0x0133, 0x0135, 0x0137, 0x0138,
-    0x013A, 0x013C, 0x013E, 0x013F, 0x0140, 0x0141, 0x0142, 0x0143,
-    0x0148, 0x014A, 0x014C, 0x014D, 0x014F, 0x0151, 0x0153, 0x0154,
-    0x0155, 0x0156, 0x0157, 0x0158, 0x015D, 0x015F, 0x0161, 0x0162,
-    0x0164, 0x0166, 0x0168, 0x0169, 0x016A, 0x016B, 0x016C, 0x016D,
-    0x0172, 0x0174, 0x0176, 0x0177, 0x0179, 0x017B, 0x017D, 0x017E,
-    0x017F, 0x0180, 0x0181, 0x0182, 0x0187, 0x0189, 0x018B, 0x018C,
-    0x018E, 0x0190, 0x0192, 0x0193, 0x0194, 0x0195, 0x0196, 0x0197,
-    0x019C, 0x019E, 0x01A0, 0x01A1, 0x01A3, 0x01A5, 0x01A7, 0x01A8,
-    0x01A9, 0x01AA, 0x01AB, 0x01AC, 0x01B1, 0x01B3, 0x01B5, 0x01B6,
-    0x01B8, 0x01BA, 0x01BC, 0x01BD, 0x01BE, 0x01BF, 0x01C0, 0x01C1,
-    0x01C6, 0x01C8, 0x01CA, 0x01Cb, 0x01CD, 0x01CF, 0x01D1, 0x01D2,
-    0x01D3, 0x01D4, 0x01D5, 0x01D6, 0x01DB, 0x01DD, 0x01DF, 0x01E0,
-    0x01E2, 0x01E4, 0x01E6, 0x01E7, 0x01E8, 0x01E9, 0x01EA,
 };
 
 //=============================================================================
@@ -164,11 +92,6 @@ bool OpenGK850WPlugin::OpenDevice()
             hid_device* handle = hid_open_path(cur->path);
             if(handle)
             {
-                // Send the init command BEFORE probing - like the reference
-                // detector does, the device only answers the RID6 feature
-                // report after receiving the init command.
-                hid_send_feature_report(handle, INIT_CMD, sizeof(INIT_CMD));
-
                 // Probe: try to read Report ID 6 feature report.
                 unsigned char buf[1032];
                 memset(buf, 0, sizeof(buf));
@@ -252,7 +175,8 @@ void OpenGK850WPlugin::RescanDevice()
 void OpenGK850WPlugin::SendInitCommands()
 {
     if(!dev_handle) return;
-    hid_send_feature_report(dev_handle, INIT_CMD, sizeof(INIT_CMD));
+    // No init command needed - the device responds to mode commands directly
+    GK_LOG_INFO("SendInitCommands: done (no init needed)\n");
 }
 
 unsigned int OpenGK850WPlugin::CurrentMode()
@@ -277,87 +201,73 @@ void OpenGK850WPlugin::SendModePacket(unsigned char mode, unsigned char speed, u
 {
     if(!dev_handle) return;
 
-    unsigned char buf[REPORT_SIZE_LED];
-    memcpy(buf, MODE_PACKET_TEMPLATE, sizeof(MODE_PACKET_TEMPLATE));
+    // Report ID 5 (0x05): Mode command
+    // Format: 05 8X YY ZZ WW 00
+    // where X = mode value, Y = speed, Z = brightness, W = additional param
+    // This is the SIMPLE and CORRECT way to set mode on this device.
+    unsigned char cmd[6] = {0x05, static_cast<unsigned char>(0x80 | mode), speed, brightness, 0x00, 0x00};
 
-    // Mode byte at 0x15
-    buf[0x15] = mode;
-
-    // For per-key mode, set the per-key flag and command byte
-    if(mode == DEVICE_MODE_PER_KEY)
+    GK_LOG_INFO("SendModePacket: mode=0x%02X speed=0x%02X brightness=0x%02X\n", mode, speed, brightness);
+    
+    int ret = hid_send_feature_report(dev_handle, cmd, sizeof(cmd));
+    if(ret < 0)
     {
-        buf[0x14] = 0x01;
-        buf[0x27] = 0x24;
+        GK_LOG_INFO("SendModePacket: hid_send_feature_report failed (ret=%d)\n", ret);
     }
-
-    // Speed/brightness byte (0x29 + ((mode-2)*2) for animated modes)
-    // For static/per-key, use the base position
-    int sb_index = 0x29;
-    if(mode >= 0x02)
-    {
-        sb_index = 0x29 + ((mode - 2) * 2);
-    }
-    if(sb_index < REPORT_SIZE_LED)
-    {
-        buf[sb_index] = speed + brightness;
-    }
-
-    hid_send_feature_report(dev_handle, buf, REPORT_SIZE_LED);
 }
 
 void OpenGK850WPlugin::SendStaticColorPacket(RGBColor color)
 {
     if(!dev_handle) return;
 
+    // For static color, we first set mode to STATIC (0x83) via RID5,
+    // then send the color via a RID6 report with the proper layout.
+    // The previous implementation used header 06 08 B8 which appears to
+    // trigger Bluetooth mode - that was the bug!
+    
+    // First ensure we're in static mode
+    unsigned char mode_cmd[6] = {0x05, 0x83, SPEED_NORMAL, BRIGHTNESS_FULL, 0x00, 0x00};
+    hid_send_feature_report(dev_handle, mode_cmd, sizeof(mode_cmd));
+    
+    // Now send the color data via RID6
+    // Layout: sequential RGB pairs for all keys
     unsigned char buf[REPORT_SIZE_LED];
     memset(buf, 0x00, sizeof(buf));
-
-    // Header: 06 08 B8 00 40
-    buf[0x00] = 0x06;
-    buf[0x01] = 0x08;
-    buf[0x02] = 0xB8;
-    buf[0x03] = 0x00;
-    buf[0x04] = 0x40;
-
-    // Color at 0x1D-0x1F (R, G, B)
-    buf[0x1D] = RGBGetRValue(color);
-    buf[0x1E] = RGBGetGValue(color);
-    buf[0x1F] = RGBGetBValue(color);
-
-    // Set all key indices to 0xFF
-    for(unsigned int i = 0; i < sizeof(STATIC_KEY_INDICES)/sizeof(unsigned int); i++)
+    buf[0] = 0x06;  // Report ID 6
+    
+    // Fill all keys with the static color (sequential RGB layout)
+    for(unsigned int i = 0; i < 1029 / 3; i++)
     {
-        unsigned int idx = STATIC_KEY_INDICES[i];
-        if(idx < REPORT_SIZE_LED)
-        {
-            buf[idx] = 0xFF;
-        }
+        buf[1 + i * 3]     = RGBGetRValue(color);
+        buf[2 + i * 3]     = RGBGetGValue(color);
+        buf[3 + i * 3]     = RGBGetBValue(color);
     }
-
-    hid_send_feature_report(dev_handle, buf, REPORT_SIZE_LED);
+    
+    GK_LOG_INFO("SendStaticColorPacket: R=%d G=%d B=%d\n", RGBGetRValue(color), RGBGetGValue(color), RGBGetBValue(color));
+    
+    int ret = hid_send_feature_report(dev_handle, buf, REPORT_SIZE_LED);
+    if(ret < 0)
+    {
+        GK_LOG_INFO("SendStaticColorPacket: hid_send_feature_report failed (ret=%d)\n", ret);
+    }
 }
 
 void OpenGK850WPlugin::SendPerKeyPacket()
 {
     if(!dev_handle) return;
 
+    // First ensure we're in per-key mode (0x15)
+    unsigned char mode_cmd[6] = {0x05, 0x15, SPEED_NORMAL, BRIGHTNESS_FULL, 0x00, 0x00};
+    hid_send_feature_report(dev_handle, mode_cmd, sizeof(mode_cmd));
+
+    // Report ID 6 (0x06): Per-key LED data, 1032 bytes total
+    // First byte is report ID (0x06), rest is LED data
+    // Layout: sequential RGB pairs for each key index
     unsigned char buf[REPORT_SIZE_LED];
     memset(buf, 0x00, sizeof(buf));
+    buf[0] = 0x06;
 
-    // Header: 06 09 BC 00 40
-    buf[0x00] = 0x06;
-    buf[0x01] = 0x09;
-    buf[0x02] = 0xBC;
-    buf[0x03] = 0x00;
-    buf[0x04] = 0x40;
-
-    // Copy per-key command part at 0x027C
-    for(unsigned int i = 0; i < sizeof(PER_KEY_CMD_PART); i++)
-    {
-        buf[0x027C + i] = PER_KEY_CMD_PART[i];
-    }
-
-    // Fill per-key color data: B at index, G at index+0x7E, R at index+0x7E+0x7E
+    // Fill LED colors using the TKL key map - each key uses 3 bytes (RGB)
     unsigned int num_keys = sizeof(TKL_KEYS_PER_KEY_INDEX) / sizeof(unsigned char);
     unsigned int num_leds = std::min(num_keys, (unsigned int)leds.size());
 
@@ -365,22 +275,24 @@ void OpenGK850WPlugin::SendPerKeyPacket()
     {
         unsigned int idx = TKL_KEYS_PER_KEY_INDEX[i];
         RGBColor c = leds[i];
-
-        if(idx < REPORT_SIZE_LED)
+        
+        // Each key occupies 3 bytes starting at position 1 + idx*3
+        unsigned int offset = 1 + idx * 3;
+        if(offset + 2 < REPORT_SIZE_LED)
         {
-            buf[idx]                 = RGBGetBValue(c);
-            if(idx + 0x7E < REPORT_SIZE_LED)
-            {
-                buf[idx + 0x7E]      = RGBGetGValue(c);
-            }
-            if(idx + 0x7E + 0x7E < REPORT_SIZE_LED)
-            {
-                buf[idx + 0x7E + 0x7E] = RGBGetRValue(c);
-            }
+            buf[offset]     = RGBGetRValue(c);
+            buf[offset + 1] = RGBGetGValue(c);
+            buf[offset + 2] = RGBGetBValue(c);
         }
     }
 
-    hid_send_feature_report(dev_handle, buf, REPORT_SIZE_LED);
+    GK_LOG_INFO("SendPerKeyPacket: %d keys\n", num_leds);
+    
+    int ret = hid_send_feature_report(dev_handle, buf, REPORT_SIZE_LED);
+    if(ret < 0)
+    {
+        GK_LOG_INFO("SendPerKeyPacket: hid_send_feature_report failed (ret=%d)\n", ret);
+    }
 }
 
 //=============================================================================
@@ -472,28 +384,24 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
         self->SyncModeFromController();
         unsigned int mode = self->CurrentMode();
 
-        // Static color does NOT use the mode-brightness-speed packet at all in
-        // this protocol - it uses its own dedicated SetStaticColor report
-        // (06 08 B8 00 40). Sending a mode packet here triggers Bluetooth/off
-        // side effects on the GK850W chip.
-        if(mode == MODE_STATIC || mode == MODE_PER_KEY)
-        {
-            if(mode == MODE_STATIC)
-            {
-                RGBColor c = self->leds.empty() ? ToRGBColor(0,0,0) : self->leds[0];
-                self->SendStaticColorPacket(c);
-            }
-            else
-            {
-                // Custom per-key mode: enable per-key addressing, then push colors
-                self->SendModePacket(DEVICE_MODE_PER_KEY, SPEED_NORMAL, BRIGHTNESS_FULL);
-                self->SendPerKeyPacket();
-            }
-            return;
-        }
+        GK_LOG_INFO("DeviceUpdateMode: mode=0x%02X\n", mode);
 
-        // Off mode
-        self->SendModePacket(DEVICE_MODE_OFF, SPEED_NORMAL, BRIGHTNESS_FULL);
+        if(mode == MODE_STATIC)
+        {
+            // Static mode: send mode command + color
+            RGBColor c = self->leds.empty() ? ToRGBColor(0xFF,0,0) : self->leds[0];
+            self->SendStaticColorPacket(c);
+        }
+        else if(mode == MODE_PER_KEY)
+        {
+            // Per-key mode: send mode command + colors
+            self->SendPerKeyPacket();
+        }
+        else
+        {
+            // Off mode
+            self->SendModePacket(MODE_OFF, SPEED_NORMAL, BRIGHTNESS_FULL);
+        }
     };
 
     // Register self as object pointer for callbacks

@@ -7,30 +7,29 @@
 #include <QMap>
 #include <hidapi.h>
 
-// Number of LEDs (61 for TKL layout, adjust as needed)
-static constexpr int NUM_LEDS = 61;
+// Number of LEDs (86 for TKL layout - matches reference controller key map)
+static constexpr int NUM_LEDS = 86;
 
-// OpenRGB mode values (match RGBController.h)
-#define MODE_OFF              0x00
-#define MODE_STATIC           0x01
-#define MODE_PER_KEY          0x15
-
-// Device mode values used in the mode packet (Report ID 6, byte 0x15).
-// NOTE: these come from the reference SinowealthKeyboardController (FL eSports
-// F11, same chip) and match the PCAP captures. The GK850W patch in this repo
-// used wrong values (0x83 static / 0x16 off) which send Bluetooth/off commands.
-#define DEVICE_MODE_OFF              0x00   // Turn off lights
-#define DEVICE_MODE_STATIC           0x01   // Static color (handled by SetStaticColor packet)
-#define DEVICE_MODE_PER_KEY          0x15   // Per-key addressing
+// Mode values (from reference Sinowealth GK850W controller header).
+// These are the ACTUAL mode values used in Report ID 5 commands.
+// The previous values (0x01 static, 0x00 off) were incorrect and caused
+// the device to not respond properly to mode changes.
+#define MODE_OFF              0x16   // Turn off lights
+#define MODE_STATIC           0x83   // Static color mode
+#define MODE_PER_KEY          0x15   // Per-key / game mode
 
 // Speed constants (from reference controller)
-#define SPEED_SLOW                   0x12
-#define SPEED_NORMAL                 0x22
-#define SPEED_FAST                   0x32
-#define SPEED_FASTEST                0x42
+#define SPEED_SLOW            0x00
+#define SPEED_NORMAL          0x40
+#define SPEED_FAST            0x80
+#define SPEED_FASTEST         0xC0
 
-// Brightness constants
-#define BRIGHTNESS_FULL              0x04
+// Brightness constants (from reference controller)
+#define BRIGHTNESS_OFF        0x00
+#define BRIGHTNESS_MIN        0x01
+#define BRIGHTNESS_MED        0x02
+#define BRIGHTNESS_HI         0x03
+#define BRIGHTNESS_FULL       0x04
 
 // Report sizes
 #define REPORT_SIZE_LED              1032   // Report ID 6 LED data
