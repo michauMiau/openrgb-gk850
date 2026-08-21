@@ -8,12 +8,17 @@
 \*-----------------------------------------*/
 
 #include "OpenGK850WPlugin.h"
+#include "gk850_reports.h"
 #include <QLabel>
 #include <QVBoxLayout>
 #include <QPushButton>
 #include <QComboBox>
 #include <QHBoxLayout>
+#include <QPlainTextEdit>
+#include <QCheckBox>
 #include <cstring>
+#include <thread>
+#include <chrono>
 
 // Use fprintf for logging since LogManager is part of main OpenRGB, not a plugin library
 #define GK_LOG_INFO(...) fprintf(stderr, "[GK850W] " __VA_ARGS__)
@@ -27,20 +32,23 @@
 // - Effects use: 05 XX YY ZZ WW VV format
 //=============================================================================
 
-static const unsigned char INIT_CMD1[6] = {0x05, 0x83, 0xB6, 0x00, 0x00, 0x00};
-static const unsigned char INIT_CMD2[6] = {0x05, 0x88, 0xB8, 0x00, 0x00, 0x00};
+// All protocol reports are byte-accurate extractions from the vendor app's
+// USB traffic (see gk850_reports.h). Each static/per-key sequence is:
+//   init(s) -> color-data report(s) -> mode-commit report
+// The mode-commit report (RID6, header 06 03 b6) is what actually applies the
+// change; without it the keyboard blinks and reverts to its previous state.
+// The commit differs per mode (on/off/game), so each has its own template.
 
-// TKL per-key index map (86 keys) - from reference controller
-//=============================================================================
-static const unsigned char TKL_KEYS_PER_KEY_INDEX[86] = {
-    0x08, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
-    0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x1d, 0x1E, 0x1F,
-    0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D,
-    0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F,
-    0x40, 0x41, 0x42, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x4F,
-    0x50, 0x51, 0x52, 0x54, 0x5D, 0x5f,
-    0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x6A, 0x6B,
-    0x71, 0x72, 0x73, 0x76, 0x79, 0x7A, 0x7B, 0x7F, 0x80, 0x81
+// Per-key color region: PCAP diff of the game-mode captures shows exactly 61
+// single-byte key slots (one byte per key, matching the 60% layout). The app
+// writes each key's value into these fixed offsets. We map OpenRGB LED index i
+// to GK_PERKEY_OFFSETS[i].
+static const unsigned int GK_PERKEY_OFFSETS[61] = {
+    281, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294,
+    302, 303, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315,
+    323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 336,
+    344, 346, 347, 348, 349, 350, 351, 352, 353, 354, 355, 357,
+    365, 366, 367, 370, 373, 374, 375, 378
 };
 
 //=============================================================================
@@ -56,80 +64,46 @@ bool OpenGK850WPlugin::OpenDevice()
 
     hid_init();
 
-    // The GK850W exposes multiple HID interfaces (lsusb -v shows 2: a boot
-    // keyboard + a vendor RGB interface). The reference Sinowealth detector does
-    // NOT trust usage_page alone - it probes each interface by attempting to read
-    // the Report ID 6 feature report. We do the same: enumerate all matching
-    // interfaces, log each one, and pick the interface that responds to the RGB
-    // feature report (and whose product string matches "GK850").
+    // The GK850W exposes multiple HID interfaces. PCAP analysis shows RGB
+    // feature reports go to interface 1 (wIndex=0001). We prefer iface 1,
+    // but fall back to probing if needed.
     struct hid_device_info* devs = hid_enumerate(0x258A, 0x0049);
     struct hid_device_info* cur  = devs;
     bool                    saw_any = false;
-    hid_device*             match = nullptr;
-    hid_device*             last_resort = nullptr;   // product-matched, non-boot candidate
+    hid_device*             iface1_match = nullptr;  // Preferred: interface_number == 1
+    hid_device*             last_resort = nullptr;   // Fallback
 
     while(cur)
     {
         saw_any = true;
 
-        // Read product string for identification/logging
-        std::string prod;
-        {
-            hid_device* tmp = hid_open_path(cur->path);
-            if(tmp)
-            {
-                wchar_t product[128] = {0};
-                if(hid_get_product_string(tmp, product, 127) == 0)
-                {
-                    std::wstring wprod(product);
-                    prod.assign(wprod.begin(), wprod.end());
-                }
-                hid_close(tmp);
-            }
-        }
-
-        GK_LOG_INFO("USB iface: path=%s usage_page=0x%04X usage=0x%04X iface=%d product='%s'\n",
+        // Log each interface
+        GK_LOG_INFO("USB iface: path=%s usage_page=0x%04X usage=0x%04X iface=%d\n",
                     cur->path ? cur->path : "(null)", cur->usage_page, cur->usage,
-                    cur->interface_number, prod.c_str());
+                    cur->interface_number);
 
-        // Skip the boot-keyboard interface (usage_page 0x01) - kernel-owned, never
-        // opens and never carries RGB data. Also require product string match.
-        bool product_ok = (prod.find("GK850") != std::string::npos ||
-                           prod.find("gk850") != std::string::npos);
-
-        if(cur->usage_page != 0x01 && product_ok)
+        // Prefer interface 1 (where RGB reports go according to PCAP)
+        if(cur->interface_number == 1 && !iface1_match)
         {
-            // Open the candidate interface.
             hid_device* handle = hid_open_path(cur->path);
             if(handle)
             {
-                // Probe: try to read Report ID 6 feature report.
-                unsigned char buf[1032];
-                memset(buf, 0, sizeof(buf));
-                buf[0] = 0x06;   // Report ID 6
-
-                int r = hid_get_feature_report(handle, buf, sizeof(buf));
-                if(r > 0)
-                {
-                    GK_LOG_INFO("Interface responds to RID6 feature report (len=%d) - selected.\n", r);
-                    if(last_resort) hid_close(last_resort);  // close unused candidate
-                    match = handle;
-                    break;
-                }
-                else
-                {
-                    GK_LOG_INFO("Interface does not respond to RID6, trying next.\n");
-                    if(last_resort == nullptr)
-                    {
-                        last_resort = handle;   // keep open as fallback
-                    }
-                    else
-                    {
-                        hid_close(handle);      // already have a candidate
-                    }
-                }
+                GK_LOG_INFO("Found interface 1: %s - selected for RGB control\n", cur->path);
+                iface1_match = handle;
+                break;  // We have what we want
             }
         }
+
+        // Keep track of any other valid interface as fallback
+        if(!last_resort && cur->usage_page != 0x01)
+        {
+            hid_device* handle = hid_open_path(cur->path);
+            if(handle)
+            {
+                last_resort = handle;
+            }
+        }
+
         cur = cur->next;
     }
 
@@ -137,29 +111,28 @@ bool OpenGK850WPlugin::OpenDevice()
 
     if(!saw_any)
     {
-        GK_LOG_INFO("No HID interfaces found for VID:PID 258A:0049 (check udev rule / permissions)\n");
-    }
-
-    // If the probe didn't positively identify the interface, fall back to the
-    // product-matched non-boot candidate (still safe: product string verified).
-    if(!match && last_resort)
-    {
-        GK_LOG_INFO("Using fallback product-matched interface (no RID6 response)\n");
-        match = last_resort;
-    }
-
-    if(!match)
-    {
-        GK_LOG_INFO("Device not found (VID:PID 258A:0049)\n");
+        GK_LOG_INFO("No HID interfaces found for VID:PID 258A:0049\n");
         return false;
     }
 
-    dev_handle = match;
+    // Use interface 1 if found, otherwise fall back
+    hid_device* match = iface1_match ? iface1_match : last_resort;
 
-    // Send init commands to unlock the device
-    SendInitCommands();
-    GK_LOG_INFO("Device opened successfully\n");
-    return true;
+    if(match)
+    {
+        if(iface1_match)
+            GK_LOG_INFO("Using interface 1 (RGB vendor interface)\n");
+        else
+            GK_LOG_INFO("Using fallback interface (no iface 1 found)\n");
+
+        dev_handle = match;
+        SendInitCommands(true);
+        GK_LOG_INFO("Device opened successfully\n");
+        return true;
+    }
+
+    GK_LOG_INFO("Failed to open any HID interface\n");
+    return false;
 }
 
 void OpenGK850WPlugin::CloseDevice()
@@ -183,13 +156,18 @@ void OpenGK850WPlugin::RescanDevice()
 // Protocol helpers
 //=============================================================================
 
-void OpenGK850WPlugin::SendInitCommands()
+void OpenGK850WPlugin::SendInitCommands(bool full)
 {
     if(!dev_handle) return;
-    // Send BOTH init commands - both are present in PCAP captures
-    hid_send_feature_report(dev_handle, INIT_CMD1, sizeof(INIT_CMD1));
-    hid_send_feature_report(dev_handle, INIT_CMD2, sizeof(INIT_CMD2));
-    GK_LOG_INFO("SendInitCommands: done (both init commands sent)\n");
+    // PCAP-verified: static/off sequences start with BOTH init commands
+    // (05 83 b6 + 05 88 b8); the per-key/game sequence starts with only the
+    // first one (05 83 b6). `full` selects which to send.
+    hid_send_feature_report(dev_handle, GK_INIT_1, sizeof(GK_INIT_1));
+    if(full)
+    {
+        hid_send_feature_report(dev_handle, GK_INIT_2, sizeof(GK_INIT_2));
+    }
+    GK_LOG_INFO("SendInitCommands: sent %s\n", full ? "init1+init2" : "init1 only");
 }
 
 unsigned int OpenGK850WPlugin::CurrentMode()
@@ -210,21 +188,25 @@ void OpenGK850WPlugin::SyncModeFromController()
     current_mode = CurrentMode();
 }
 
-void OpenGK850WPlugin::SendModePacket(unsigned char mode, unsigned char speed, unsigned char brightness)
+void OpenGK850WPlugin::SendModeCommit(CommitType type)
 {
     if(!dev_handle) return;
-
-    // Report ID 5 (0x05): Mode command
-    // Format: 05 MODE SPEED BRIGHTNESS 00 00
-    // Mode value is used directly (no bitwise operations)
-    unsigned char cmd[6] = {0x05, mode, speed, brightness, 0x00, 0x00};
-
-    GK_LOG_INFO("SendModePacket: mode=0x%02X speed=0x%02X brightness=0x%02X\n", mode, speed, brightness);
-    
-    int ret = hid_send_feature_report(dev_handle, cmd, sizeof(cmd));
+    // PCAP-verified: after the color-data report the working app sends a
+    // 1032-byte "commit" report (06 03 b6). This is what actually applies the
+    // change. Without it the keyboard blinks and reverts to its previous state.
+    // The commit encodes the mode in byte [21]: off=0x00, static=0x01,
+    // per-key/game=0x15 (see all_modes.pcapng: 22 unique commits).
+    const unsigned char* commit = nullptr;
+    switch(type)
+    {
+        case COMMIT_ON:   commit = GK_MODE_COMMIT_ON;   break;
+        case COMMIT_OFF:  commit = GK_MODE_COMMIT_OFF;  break;
+        case COMMIT_GAME: commit = GK_MODE_COMMIT_GAME; break;
+    }
+    int ret = hid_send_feature_report(dev_handle, commit, REPORT_SIZE_LED);
     if(ret < 0)
     {
-        GK_LOG_INFO("SendModePacket: hid_send_feature_report failed (ret=%d)\n", ret);
+        GK_LOG_INFO("SendModeCommit(%d): hid_send_feature_report failed (ret=%d)\n", (int)type, ret);
     }
 }
 
@@ -232,82 +214,128 @@ void OpenGK850WPlugin::SendStaticColorPacket(RGBColor color)
 {
     if(!dev_handle) return;
 
-    // PCAP verified: static color uses Report ID 6 with header 0608b80040
-    // Color is repeated for each LED position as RGB triplets
+    // PCAP-verified static sequence (Set_whole_keyboard_to_red.pcapng):
+    //   [0] 05 83 b6 00 00 00   (init1)
+    //   [1] 05 88 b8 00 00 00   (init2)
+    //   [2] color-data report  (06 08 b8, R/G/B at offsets 29/30/31)
+    //   [3] mode-commit report (06 03 b6)  <-- applies the change
+    SendInitCommands(true);
+
     unsigned char buf[REPORT_SIZE_LED];
-    memset(buf, 0x00, sizeof(buf));
-    
-    // Header from PCAP: 06 08 B8 00 40
-    buf[0x00] = 0x06;
-    buf[0x01] = 0x08;
-    buf[0x02] = 0xB8;
-    buf[0x03] = 0x00;
-    buf[0x04] = 0x40;
-    
-    // Fill color data - RGB triplet per LED position
-    // PCAP shows colors starting around offset 8, repeated pattern
-    for(unsigned int i = 0; i < 300; i++)  // enough for all LEDs
-    {
-        unsigned int offset = 8 + i * 4;  // spacing from PCAP analysis
-        if(offset + 2 < REPORT_SIZE_LED)
-        {
-            buf[offset]     = RGBGetRValue(color);
-            buf[offset + 1] = RGBGetGValue(color);
-            buf[offset + 2] = RGBGetBValue(color);
-        }
-    }
-    
+    memcpy(buf, GK_COLOR_DATA_ON, sizeof(GK_COLOR_DATA_ON));
+    buf[29] = RGBGetRValue(color);
+    buf[30] = RGBGetGValue(color);
+    buf[31] = RGBGetBValue(color);
+
     GK_LOG_INFO("SendStaticColorPacket: R=%d G=%d B=%d\n", RGBGetRValue(color), RGBGetGValue(color), RGBGetBValue(color));
-    
+    AddDebug(QString("Static: R=%1 G=%2 B=%3").arg(RGBGetRValue(color)).arg(RGBGetGValue(color)).arg(RGBGetBValue(color)));
+
     int ret = hid_send_feature_report(dev_handle, buf, REPORT_SIZE_LED);
     if(ret < 0)
     {
         GK_LOG_INFO("SendStaticColorPacket: hid_send_feature_report failed (ret=%d)\n", ret);
+        AddDebug(QString("ERROR: color report failed (ret=%1)").arg(ret));
     }
+    else
+    {
+        AddDebug(QString("Color data sent OK (%1 bytes)").arg(REPORT_SIZE_LED));
+    }
+
+    // Commit the change with the static-on mode code (byte [21]=0x01).
+    SendModeCommit(COMMIT_ON);
 }
 
 void OpenGK850WPlugin::SendPerKeyPacket()
 {
     if(!dev_handle) return;
 
-    // PCAP verified: per-key uses Report ID 6 with header 0609bc0040
-    unsigned char buf[REPORT_SIZE_LED];
-    memset(buf, 0x00, sizeof(buf));
-    
-    // Header from PCAP: 06 09 BC 00 40
-    buf[0x00] = 0x06;
-    buf[0x01] = 0x09;
-    buf[0x02] = 0xBC;
-    buf[0x03] = 0x00;
-    buf[0x04] = 0x40;
-
-    // Fill per-key color data using TKL key map
-    // PCAP shows data starts after header, one RGB per key index
-    unsigned int num_keys = sizeof(TKL_KEYS_PER_KEY_INDEX) / sizeof(unsigned char);
-    unsigned int num_leds = std::min(num_keys, (unsigned int)leds.size());
-
-    for(unsigned int i = 0; i < num_leds; i++)
+    // PCAP-verified per-key sequence (game_mode_adressable_.pcapng):
+    //   [0] 05 83 b6 00 00 00   (init1 only - NO init2 for game mode)
+    //   [1] 06 09 bc ...        (key color data, RGB blocks 126B apart)
+    //   [2] 06 09 c0 ...        (second per-key report)
+    //   [3] 06 03 b6 ...        (mode commit, mode=0x15)
+    //
+    // Real-time optimization: the vendor app sends init1 only ONCE when
+    // entering game mode, then streams bc/c0 reports WITHOUT re-committing.
+    // Re-sending init + commit on every LED update makes the keyboard blink
+    // black (each commit restarts the lighting engine). So:
+    //   - inits are sent only on mode ENTRY (perkey_inited flag),
+    //   - the commit is sent only on mode entry (or explicit force).
+    if(!perkey_inited)
     {
-        unsigned int idx = TKL_KEYS_PER_KEY_INDEX[i];
-        RGBColor c = leds[i];
-        
-        // Each key at position idx * 4 + 8 (based on PCAP spacing)
-        unsigned int offset = 8 + idx * 4;
-        if(offset + 2 < REPORT_SIZE_LED)
+        if(!skip_init_reports)
         {
-            buf[offset]     = RGBGetRValue(c);
-            buf[offset + 1] = RGBGetGValue(c);
-            buf[offset + 2] = RGBGetBValue(c);
+            SendInitCommands(false);
+        }
+        perkey_inited = true;
+        perkey_needs_commit = true;
+    }
+
+    unsigned char buf[REPORT_SIZE_LED];
+    memcpy(buf, GK_PERKEY_DATA_1, sizeof(GK_PERKEY_DATA_1));
+
+    unsigned char buf2[REPORT_SIZE_LED];
+    memcpy(buf2, GK_PERKEY_DATA_2, sizeof(GK_PERKEY_DATA_2));
+
+    // All three channels live in the SAME bc report. Channel blocks are 126
+    // bytes apart: R = GK_PERKEY_OFFSETS, G = offsets-126, B = offsets-252.
+    // ESC (key 0): R=281, G=155, B=29. Verified against esc_green/esc_blue.
+    unsigned int num_leds = NUM_LEDS;
+    if(virtual_controller) {
+        zone z = virtual_controller->GetZone(0);
+        if(z.colors && z.leds_count > 0) {
+            num_leds = std::min((unsigned int)NUM_LEDS, z.leds_count);
+            for(unsigned int i = 0; i < num_leds; i++)
+            {
+                buf[GK_PERKEY_OFFSETS[i]]       = RGBGetRValue(z.colors[i]);
+                buf[GK_PERKEY_OFFSETS[i] - 126] = RGBGetGValue(z.colors[i]);
+                buf[GK_PERKEY_OFFSETS[i] - 252] = RGBGetBValue(z.colors[i]);
+            }
         }
     }
 
-    GK_LOG_INFO("SendPerKeyPacket: %d keys\n", num_leds);
-    
     int ret = hid_send_feature_report(dev_handle, buf, REPORT_SIZE_LED);
     if(ret < 0)
     {
-        GK_LOG_INFO("SendPerKeyPacket: hid_send_feature_report failed (ret=%d)\n", ret);
+        GK_LOG_INFO("SendPerKeyPacket[1]: hid_send_feature_report failed (ret=%d)\n", ret);
     }
+
+    // Part 2: second per-key report (template from PCAP).
+    ret = hid_send_feature_report(dev_handle, buf2, REPORT_SIZE_LED);
+    if(ret < 0)
+    {
+        GK_LOG_INFO("SendPerKeyPacket[2]: hid_send_feature_report failed (ret=%d)\n", ret);
+    }
+
+    // Commit only on mode entry; streaming updates skip it so the keyboard
+    // doesn't blink black on every frame.
+    if(perkey_needs_commit && !skip_init_reports)
+    {
+        SendModeCommit(COMMIT_GAME);
+        perkey_needs_commit = false;
+    }
+}
+
+void OpenGK850WPlugin::SendOffPacket(RGBColor last_color)
+{
+    if(!dev_handle) return;
+    (void)last_color;
+
+    // PCAP-verified off sequence (keyboard_off.pcapng):
+    //   [0] 05 83 b6 00 00 00   (init1)
+    //   [1] 05 88 b8 00 00 00   (init2)
+    //   [2] color-data report  (06 08 b8, template from PCAP)
+    //   [3] mode-commit report (06 03 b6, off variant, byte [21]=0x00)
+    SendInitCommands(true);
+
+    int ret = hid_send_feature_report(dev_handle, GK_COLOR_DATA_OFF, REPORT_SIZE_LED);
+    if(ret < 0)
+    {
+        GK_LOG_INFO("SendOffPacket: color-data failed (ret=%d)\n", ret);
+    }
+
+    // Commit with the OFF mode code.
+    SendModeCommit(COMMIT_OFF);
 }
 
 //=============================================================================
@@ -318,6 +346,11 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
 {
     api = plugin_api_ptr;
     GK_LOG_INFO("Plugin loading...\n");
+
+    // Delay before device enumeration to avoid race condition with OpenRGB startup.
+    // The keyboard may not be fully enumerated yet when the plugin loads.
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    GK_LOG_INFO("Load: waited 1000ms before opening device\n");
 
     OpenDevice();
 
@@ -359,12 +392,16 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
     m.color_mode = MODE_COLORS_NONE;
     setup.modes.push_back(m);
 
-    // Add zone - whole keyboard
+    // Add zone - whole keyboard (with named LEDs + matrix map so the device
+    // section in OpenRGB shows an editable keyboard layout like native
+    // controllers).
     zone z;
     z.name = "Keyboard";
     z.type = ZONE_TYPE_MATRIX;
     z.leds_count = NUM_LEDS;
     setup.zones.push_back(z);
+
+    SetupKeyboardLayout(setup);
 
     // Callback for updating LEDs via HID
     setup.DeviceUpdateLEDs = [](void* arg) {
@@ -372,13 +409,23 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
         if(!self->dev_handle) return;
 
         unsigned int mode = self->CurrentMode();
+        
         if(mode == MODE_PER_KEY)
         {
             self->SendPerKeyPacket();
         }
         else if(mode == MODE_STATIC)
         {
-            RGBColor c = self->leds.empty() ? ToRGBColor(0,0,0) : self->leds[0];
+            // Get color from the active mode using OpenRGB API
+            RGBColor c = ToRGBColor(255, 0, 0); // Default red
+            
+            if(self->virtual_controller) {
+                int active_mode_idx = self->virtual_controller->GetActiveMode();
+                if(active_mode_idx >= 0) {
+                    c = self->virtual_controller->GetModeColor(active_mode_idx, 0);
+                }
+            }
+            
             self->SendStaticColorPacket(c);
         }
     };
@@ -397,13 +444,36 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
         if(!self->dev_handle) return;
 
         self->SyncModeFromController();
+        // Mode change: force fresh init + commit for the new mode.
+        self->perkey_inited = false;
         unsigned int mode = self->CurrentMode();
 
         GK_LOG_INFO("DeviceUpdateMode: mode=0x%02X\n", mode);
 
         if(mode == MODE_STATIC)
         {
-            RGBColor c = self->leds.empty() ? ToRGBColor(0xFF,0,0) : self->leds[0];
+            // Get color from OpenRGB using proper API
+            RGBColor c = ToRGBColor(255, 0, 0); // Default to red
+            
+            if(self->virtual_controller) {
+                int active_mode_idx = self->virtual_controller->GetActiveMode();
+                
+                if(active_mode_idx >= 0) {
+                    // Get the color for this mode
+                    c = self->virtual_controller->GetModeColor(active_mode_idx, 0);
+                    
+                    // If black (all zeros), use red as default
+                    if(RGBGetRValue(c) == 0 && RGBGetGValue(c) == 0 && RGBGetBValue(c) == 0) {
+                        c = ToRGBColor(255, 0, 0);
+                    }
+                    
+                    self->AddDebug(QString("Static color: R=%1 G=%2 B=%3")
+                        .arg(RGBGetRValue(c))
+                        .arg(RGBGetGValue(c))
+                        .arg(RGBGetBValue(c)));
+                }
+            }
+            
             self->SendStaticColorPacket(c);
         }
         else if(mode == MODE_PER_KEY)
@@ -412,8 +482,8 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
         }
         else
         {
-            // Off mode: send RID6 with all zeros (from keyboard_off.pcapng)
-            self->SendStaticColorPacket(ToRGBColor(0,0,0));
+            // Off mode: send the PCAP-verified off sequence (color-data + commit_off)
+            self->SendOffPacket(ToRGBColor(0,0,0));
         }
     };
 
@@ -435,6 +505,58 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
         }
     }
 
+void OpenGK850WPlugin::SetupKeyboardLayout(RGBController_Setup& setup)
+{
+    // 61 keys, GK850W 60% layout. 5 rows x 15 cols matrix map.
+    // Row layouts (LED index per column, -1 = no key):
+    static const int ROWS[5][15] = {
+        { 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, -1, 13},  /* Esc..Backspace */
+        {14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, -1, 27},  /* Tab..Backslash */
+        {28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, -1, -1, 40},  /* Caps..Enter    */
+        {41, -1, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, -1, -1, 52},  /* Shift..RShift  */
+        {53, 54, 55, 56, 57, -1, 58, -1, -1, 59, -1, -1, -1, 60, -1}   /* Ctrl..RCtrl    */
+    };
+
+    static const char* LED_NAMES[61] = {
+        "Esc","1","2","3","4","5","6","7","8","9","0","-","=","Backspace",
+        "Tab","Q","W","E","R","T","Y","U","I","O","P","[","]","\\",
+        "Caps Lock","A","S","D","F","G","H","J","K","L",";","'","Enter",
+        "L Shift","Z","X","C","V","B","N","M",",",".","/","R Shift",
+        "L Ctrl","L Win","L Alt","Space","R Alt","Fn","Menu","R Ctrl"
+    };
+
+    setup.leds.clear();
+    for(unsigned int i = 0; i < NUM_LEDS; i++)
+    {
+        led l;
+        l.name  = (i < 61 && LED_NAMES[i]) ? LED_NAMES[i]
+                  : ("Key " + std::to_string(i));
+        l.value = i;
+        setup.leds.push_back(l);
+    }
+
+    if(!setup.zones.empty())
+    {
+        zone& kz = setup.zones.back();
+
+        unsigned int map[5 * 15];
+        unsigned int col_count = 0;
+        for(unsigned int r = 0; r < 5; r++)
+        {
+            unsigned int row_cols = 0;
+            for(unsigned int c = 0; c < 15; c++)
+            {
+                int idx = ROWS[r][c];
+                map[r * 15 + c] = (idx >= 0) ? (unsigned int)idx : 0xFFFFFFFF;
+                row_cols++;
+            }
+            if(row_cols > col_count) col_count = row_cols;
+        }
+
+        kz.matrix_map.Set(5, 15, map);
+    }
+}
+
 QWidget* OpenGK850WPlugin::GetWidget()
 {
     QWidget* w = new QWidget();
@@ -445,6 +567,16 @@ QWidget* OpenGK850WPlugin::GetWidget()
         "GK850W Connected\nProduct: BY Tech GK850" :
         "GK850W Virtual Controller\n(No device detected)");
     layout->addWidget(status_label);
+
+    // Debug log (scrollable, keeps last 50 lines, auto-scrolls to newest)
+    auto* debug_log_widget = new QPlainTextEdit();
+    debug_log_widget->setReadOnly(true);
+    debug_log_widget->setMaximumHeight(150);
+    debug_log_widget->setPlainText("Debug log:\n(device not opened yet)");
+    layout->addWidget(debug_log_widget);
+
+    // Store reference so AddDebug() can update it live
+    widget_debug_log = debug_log_widget;
 
     // Mode selector
     auto* mode_combo = new QComboBox();
@@ -474,9 +606,21 @@ QWidget* OpenGK850WPlugin::GetWidget()
             "GK850W Virtual Controller\n(No device detected)");
     });
 
+    // Real-time test: skip ALL init reports and mode commits, send only the
+    // raw color data reports. Use if the keyboard still blinks on updates.
+    auto* skip_init_check = new QCheckBox("Skip init/commit (real-time test)");
+    skip_init_check->setChecked(skip_init_reports);
+    QObject::connect(skip_init_check, &QCheckBox::toggled, [this](bool checked) {
+        skip_init_reports = checked;
+        perkey_inited = false;  // re-init when unchecked
+        AddDebug(QString("Skip init/commit: %1").arg(checked ? "ON" : "OFF"));
+    });
+
     auto* btn_row = new QHBoxLayout();
     btn_row->addWidget(apply_btn);
     btn_row->addWidget(rescan_btn);
+
+    layout->addWidget(skip_init_check);
 
     layout->addWidget(mode_combo);
     layout->addLayout(btn_row);

@@ -1,26 +1,20 @@
 /****************************************************************************
 ** Meta object code from reading C++ file 'OpenGK850WPlugin.h'
 **
-** Created by: The Qt Meta Object Compiler version 68 (Qt 6.8.2)
+** Created by: The Qt Meta Object Compiler version 68 (Qt 6.4.2)
 **
 ** WARNING! All changes made in this file will be lost!
 *****************************************************************************/
 
+#include <memory>
 #include "OpenGK850WPlugin.h"
 #include <QtGui/qtextcursor.h>
 #include <QtCore/qmetatype.h>
 #include <QtCore/qplugin.h>
-
-#include <QtCore/qtmochelpers.h>
-
-#include <memory>
-
-
-#include <QtCore/qxptype_traits.h>
 #if !defined(Q_MOC_OUTPUT_REVISION)
 #error "The header file 'OpenGK850WPlugin.h' doesn't include <QObject>."
 #elif Q_MOC_OUTPUT_REVISION != 68
-#error "This file was generated using the moc from 6.8.2. It"
+#error "This file was generated using the moc from 6.4.2. It"
 #error "cannot be used with the include files from this version of Qt."
 #error "(The moc has changed too much.)"
 #endif
@@ -29,26 +23,29 @@
 #define Q_CONSTINIT
 #endif
 
+QT_BEGIN_MOC_NAMESPACE
 QT_WARNING_PUSH
 QT_WARNING_DISABLE_DEPRECATED
-QT_WARNING_DISABLE_GCC("-Wuseless-cast")
 namespace {
-struct qt_meta_tag_ZN16OpenGK850WPluginE_t {};
+struct qt_meta_stringdata_OpenGK850WPlugin_t {
+    uint offsetsAndSizes[2];
+    char stringdata0[17];
+};
+#define QT_MOC_LITERAL(ofs, len) \
+    uint(sizeof(qt_meta_stringdata_OpenGK850WPlugin_t::offsetsAndSizes) + ofs), len 
+Q_CONSTINIT static const qt_meta_stringdata_OpenGK850WPlugin_t qt_meta_stringdata_OpenGK850WPlugin = {
+    {
+        QT_MOC_LITERAL(0, 16)   // "OpenGK850WPlugin"
+    },
+    "OpenGK850WPlugin"
+};
+#undef QT_MOC_LITERAL
 } // unnamed namespace
 
-
-#ifdef QT_MOC_HAS_STRINGDATA
-static constexpr auto qt_meta_stringdata_ZN16OpenGK850WPluginE = QtMocHelpers::stringData(
-    "OpenGK850WPlugin"
-);
-#else  // !QT_MOC_HAS_STRINGDATA
-#error "qtmochelpers.h not found or too old."
-#endif // !QT_MOC_HAS_STRINGDATA
-
-Q_CONSTINIT static const uint qt_meta_data_ZN16OpenGK850WPluginE[] = {
+Q_CONSTINIT static const uint qt_meta_data_OpenGK850WPlugin[] = {
 
  // content:
-      12,       // revision
+      10,       // revision
        0,       // classname
        0,    0, // classinfo
        0,    0, // methods
@@ -63,11 +60,11 @@ Q_CONSTINIT static const uint qt_meta_data_ZN16OpenGK850WPluginE[] = {
 
 Q_CONSTINIT const QMetaObject OpenGK850WPlugin::staticMetaObject = { {
     QMetaObject::SuperData::link<QObject::staticMetaObject>(),
-    qt_meta_stringdata_ZN16OpenGK850WPluginE.offsetsAndSizes,
-    qt_meta_data_ZN16OpenGK850WPluginE,
+    qt_meta_stringdata_OpenGK850WPlugin.offsetsAndSizes,
+    qt_meta_data_OpenGK850WPlugin,
     qt_static_metacall,
     nullptr,
-    qt_incomplete_metaTypeArray<qt_meta_tag_ZN16OpenGK850WPluginE_t,
+    qt_incomplete_metaTypeArray<qt_meta_stringdata_OpenGK850WPlugin_t,
         // Q_OBJECT / Q_GADGET
         QtPrivate::TypeAndForceComplete<OpenGK850WPlugin, std::true_type>
     >,
@@ -76,10 +73,9 @@ Q_CONSTINIT const QMetaObject OpenGK850WPlugin::staticMetaObject = { {
 
 void OpenGK850WPlugin::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, void **_a)
 {
-    auto *_t = static_cast<OpenGK850WPlugin *>(_o);
-    (void)_t;
-    (void)_c;
+    (void)_o;
     (void)_id;
+    (void)_c;
     (void)_a;
 }
 
@@ -91,7 +87,7 @@ const QMetaObject *OpenGK850WPlugin::metaObject() const
 void *OpenGK850WPlugin::qt_metacast(const char *_clname)
 {
     if (!_clname) return nullptr;
-    if (!strcmp(_clname, qt_meta_stringdata_ZN16OpenGK850WPluginE.stringdata0))
+    if (!strcmp(_clname, qt_meta_stringdata_OpenGK850WPlugin.stringdata0))
         return static_cast<void*>(this);
     if (!strcmp(_clname, "OpenRGBPluginInterface"))
         return static_cast< OpenRGBPluginInterface*>(this);
@@ -133,23 +129,23 @@ static constexpr unsigned char qt_pluginMetaDataV2_OpenGK850WPlugin[] = {
     '0',  '(',  'W',  ')',  ' ',  0x62,  'I',  'd', 
     0x70,  'O',  'p',  'e',  'n',  'G',  'K',  '8', 
     '5',  '0',  'W',  'P',  'l',  'u',  'g',  'i', 
-    'n',  0x64,  'N',  'a',  'm',  'e',  0x78,  0x20, 
-    'G',  'K',  '8',  '5',  '0',  'W',  ' ',  'V', 
-    'i',  'r',  't',  'u',  'a',  'l',  ' ',  'C', 
-    'o',  'n',  't',  'r',  'o',  'l',  'l',  'e', 
-    'r',  ' ',  'P',  'l',  'u',  'g',  'i',  'n', 
-    0x77,  'O',  'p',  'e',  'n',  'R',  'G',  'B', 
-    'P',  'l',  'u',  'g',  'i',  'n',  'A',  'P', 
-    'I',  'V',  'e',  'r',  's',  'i',  'o',  'n', 
-    0x05,  0x63,  'U',  'r',  'l',  0x78,  0x2b,  'h', 
-    't',  't',  'p',  's',  ':',  '/',  '/',  'g', 
-    'i',  't',  'h',  'u',  'b',  '.',  'c',  'o', 
-    'm',  '/',  'm',  'i',  'c',  'h',  'a',  'u', 
-    'M',  'i',  'a',  'u',  '/',  'o',  'p',  'e', 
-    'n',  'r',  'g',  'b',  '-',  'g',  'k',  '8', 
-    '5',  '0',  0x6a,  'V',  'e',  'r',  's',  'i', 
-    'o',  'n',  'S',  't',  'r',  0x65,  '2',  '.', 
-    '0',  '.',  '0', 
+    'n',  0x64,  'N',  'a',  'm',  'e',  0x78,  0x23, 
+    'G',  'K',  '8',  '5',  '0',  '(',  'W',  ')', 
+    ' ',  'K',  'e',  'y',  'b',  'o',  'a',  'r', 
+    'd',  ' ',  'C',  'o',  'n',  't',  'r',  'o', 
+    'l',  'l',  'e',  'r',  ' ',  'P',  'l',  'u', 
+    'g',  'i',  'n',  0x77,  'O',  'p',  'e',  'n', 
+    'R',  'G',  'B',  'P',  'l',  'u',  'g',  'i', 
+    'n',  'A',  'P',  'I',  'V',  'e',  'r',  's', 
+    'i',  'o',  'n',  0x05,  0x63,  'U',  'r',  'l', 
+    0x78,  0x2b,  'h',  't',  't',  'p',  's',  ':', 
+    '/',  '/',  'g',  'i',  't',  'h',  'u',  'b', 
+    '.',  'c',  'o',  'm',  '/',  'm',  'i',  'c', 
+    'h',  'a',  'u',  'M',  'i',  'a',  'u',  '/', 
+    'o',  'p',  'e',  'n',  'r',  'g',  'b',  '-', 
+    'g',  'k',  '8',  '5',  '0',  0x6a,  'V',  'e', 
+    'r',  's',  'i',  'o',  'n',  'S',  't',  'r', 
+    0x63,  '3',  '.',  '0', 
     0xff, 
 };
 QT_MOC_EXPORT_PLUGIN_V2(OpenGK850WPlugin, OpenGK850WPlugin, qt_pluginMetaDataV2_OpenGK850WPlugin)
@@ -184,26 +180,27 @@ Q_CONSTINIT static constexpr unsigned char qt_pluginMetaData_OpenGK850WPlugin[] 
     '0',  '(',  'W',  ')',  ' ',  0x62,  'I',  'd', 
     0x70,  'O',  'p',  'e',  'n',  'G',  'K',  '8', 
     '5',  '0',  'W',  'P',  'l',  'u',  'g',  'i', 
-    'n',  0x64,  'N',  'a',  'm',  'e',  0x78,  0x20, 
-    'G',  'K',  '8',  '5',  '0',  'W',  ' ',  'V', 
-    'i',  'r',  't',  'u',  'a',  'l',  ' ',  'C', 
-    'o',  'n',  't',  'r',  'o',  'l',  'l',  'e', 
-    'r',  ' ',  'P',  'l',  'u',  'g',  'i',  'n', 
-    0x77,  'O',  'p',  'e',  'n',  'R',  'G',  'B', 
-    'P',  'l',  'u',  'g',  'i',  'n',  'A',  'P', 
-    'I',  'V',  'e',  'r',  's',  'i',  'o',  'n', 
-    0x05,  0x63,  'U',  'r',  'l',  0x78,  0x2b,  'h', 
-    't',  't',  'p',  's',  ':',  '/',  '/',  'g', 
-    'i',  't',  'h',  'u',  'b',  '.',  'c',  'o', 
-    'm',  '/',  'm',  'i',  'c',  'h',  'a',  'u', 
-    'M',  'i',  'a',  'u',  '/',  'o',  'p',  'e', 
-    'n',  'r',  'g',  'b',  '-',  'g',  'k',  '8', 
-    '5',  '0',  0x6a,  'V',  'e',  'r',  's',  'i', 
-    'o',  'n',  'S',  't',  'r',  0x65,  '2',  '.', 
-    '0',  '.',  '0', 
+    'n',  0x64,  'N',  'a',  'm',  'e',  0x78,  0x23, 
+    'G',  'K',  '8',  '5',  '0',  '(',  'W',  ')', 
+    ' ',  'K',  'e',  'y',  'b',  'o',  'a',  'r', 
+    'd',  ' ',  'C',  'o',  'n',  't',  'r',  'o', 
+    'l',  'l',  'e',  'r',  ' ',  'P',  'l',  'u', 
+    'g',  'i',  'n',  0x77,  'O',  'p',  'e',  'n', 
+    'R',  'G',  'B',  'P',  'l',  'u',  'g',  'i', 
+    'n',  'A',  'P',  'I',  'V',  'e',  'r',  's', 
+    'i',  'o',  'n',  0x05,  0x63,  'U',  'r',  'l', 
+    0x78,  0x2b,  'h',  't',  't',  'p',  's',  ':', 
+    '/',  '/',  'g',  'i',  't',  'h',  'u',  'b', 
+    '.',  'c',  'o',  'm',  '/',  'm',  'i',  'c', 
+    'h',  'a',  'u',  'M',  'i',  'a',  'u',  '/', 
+    'o',  'p',  'e',  'n',  'r',  'g',  'b',  '-', 
+    'g',  'k',  '8',  '5',  '0',  0x6a,  'V',  'e', 
+    'r',  's',  'i',  'o',  'n',  'S',  't',  'r', 
+    0x63,  '3',  '.',  '0', 
     0xff, 
 };
 QT_MOC_EXPORT_PLUGIN(OpenGK850WPlugin, OpenGK850WPlugin)
 #endif  // QT_MOC_EXPORT_PLUGIN_V2
 
 QT_WARNING_POP
+QT_END_MOC_NAMESPACE

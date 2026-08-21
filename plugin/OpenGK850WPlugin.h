@@ -5,6 +5,8 @@
 #include <QObject>
 #include <QString>
 #include <QMap>
+#include <QPlainTextEdit>
+#include <QScrollBar>
 #include <hidapi.h>
 
 // Number of LEDs (61 for 60% layout - GK850W is a 60% keyboard)
@@ -73,12 +75,46 @@ private:
     std::vector<RGBColor> leds;
     unsigned int current_mode = MODE_OFF;
     RGBControllerInterface* virtual_controller = nullptr;
+    QString debug_log = "no reports sent yet";
+    QPlainTextEdit* widget_debug_log = nullptr;  // Reference to UI debug log
+
+    void AddDebug(const QString& msg) {
+        debug_log += msg + "\n";
+
+        // Update UI if available: append and trim to the last 50 lines so the
+        // widget shows the newest entries (oldest are removed).
+        if(widget_debug_log) {
+            widget_debug_log->setPlainText(debug_log);
+            auto lines = debug_log.split('\n');
+            if(lines.size() > 50) {
+                lines = lines.mid(lines.size() - 50);
+                debug_log = lines.join('\n');
+                widget_debug_log->setPlainText(debug_log);
+            }
+            widget_debug_log->verticalScrollBar()->setValue(
+                widget_debug_log->verticalScrollBar()->maximum());
+        }
+    }
 
     // Protocol helpers
-    void SendInitCommands();
-    void SendModePacket(unsigned char mode, unsigned char speed, unsigned char brightness);
+    // PCAP-verified sequences:
+    //   static: init1 + init2 -> color-data (RGB @ 29/30/31) -> commit_on
+    //   off:    init1 + init2 -> color-data                -> commit_off
+    //   perkey: init1         -> bc-data + c0-data         -> commit_game
+    enum CommitType { COMMIT_ON, COMMIT_OFF, COMMIT_GAME };
+    void SendInitCommands(bool full);
+    void SendModeCommit(CommitType type);
     void SendStaticColorPacket(RGBColor color);
     void SendPerKeyPacket();
+    void SendOffPacket(RGBColor last_color);
+
+    void SetupKeyboardLayout(RGBController_Setup& setup);
+
+    // Real-time streaming state: inits/commit only on mode entry.
+    bool perkey_inited = false;
+    bool perkey_needs_commit = false;
+    // UI checkbox: skip ALL init reports and commits (pure data stream test).
+    bool skip_init_reports = false;
 
     // Returns the currently active OpenRGB mode reading the controller
     unsigned int CurrentMode();
