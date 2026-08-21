@@ -138,6 +138,10 @@ private:
     QMutex debug_mutex;
     QString pending_debug;
 
+    // Brightness/speed state (commit byte[40] / byte[59]).
+    unsigned char current_brightness = 0x34;   /* 0x30..0x34, 0x34 = max */
+    unsigned char current_speed      = 0x24;   /* 0x14/0x24/0x34 */
+
     // Returns the currently active OpenRGB mode reading the controller
     unsigned int CurrentMode();
     void SyncModeFromController();

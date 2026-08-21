@@ -180,7 +180,7 @@ unsigned int OpenGK850WPlugin::CurrentMode()
         std::string name = virtual_controller->GetModeName((unsigned int)idx);
 
         // Match by mode name - stable regardless of list order.
-        if(name == "Direct")        return MODE_PER_KEY;
+        if(name == "Custom")        return MODE_PER_KEY;
         if(name == "Static")        return MODE_STATIC;
         if(name == "Off")           return MODE_OFF;
 
@@ -236,8 +236,9 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
     // PCAP-verified effect sequence (speeds_neon_wave_red.pcapng):
     //   [0] init1 + init2
     //   [1] 06 08 b8 color-data (RGB @ 29/30/31)
-    //   [2] 06 03 b6 commit with byte[17] = effect ID, byte[18]=0x20,
-    //       byte[19]=0x02, then the per-effect parameter block.
+    //   [2] 06 03 b6 commit with byte[21] = effect ID (same field as the
+    //       static=0x01 / game=0x15 mode codes!), byte[40] = brightness
+    //       (0x31..0x34), byte[59] = speed (0x14 slow, 0x24 normal, 0x34 fast).
     SendInitCommands(true);
 
     unsigned char buf[REPORT_SIZE_LED];
@@ -252,14 +253,11 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
         GK_LOG_INFO("SendEffectPacket: color report failed (ret=%d)\n", ret);
     }
 
-    // Commit with the effect ID patched into byte[17]. Template is the ON
-    // commit (byte[17]=0x01); effects use their own ID. Parameter block at
-    // [24..] comes from the template (vendor defaults).
     unsigned char commit[REPORT_SIZE_LED];
     memcpy(commit, GK_MODE_COMMIT_ON, REPORT_SIZE_LED);
-    commit[17] = effect_id;
-    commit[18] = 0x20;
-    commit[19] = 0x02;
+    commit[21] = effect_id;   /* effect selector - same field as static/game */
+    commit[40] = current_brightness;
+    commit[59] = current_speed;
 
     ret = hid_send_feature_report(dev_handle, commit, REPORT_SIZE_LED);
     if(ret < 0)
@@ -434,22 +432,28 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
     // https://openrgb.org/wiki/doku.php?id=common_modes
     mode m;
 
-    // Direct: per-LED colors, no fade/flicker, not saved to device memory.
-    // Used by effect engines for software-driven effects.
-    m.name = "Direct";
+    // Custom: per-LED colors. Not "Direct" because the keyboard firmware
+    // blinks on every update (does not meet the no-flicker Direct criteria).
+    m.name = "Custom";
     m.value = MODE_PER_KEY;
-    m.flags = MODE_FLAG_HAS_PER_LED_COLOR;
+    m.flags = MODE_FLAG_HAS_PER_LED_COLOR | MODE_FLAG_HAS_BRIGHTNESS;
     m.color_mode = MODE_COLORS_PER_LED;
+    m.brightness_min = 0;
+    m.brightness_max = 4;
+    m.brightness = 4;
     setup.modes.push_back(m);
 
     // Static: whole device set to one static color (may flicker/save).
     m.name = "Static";
     m.value = MODE_STATIC;
-    m.flags = MODE_FLAG_HAS_MODE_SPECIFIC_COLOR;
+    m.flags = MODE_FLAG_HAS_MODE_SPECIFIC_COLOR | MODE_FLAG_HAS_BRIGHTNESS;
     m.color_mode = MODE_COLORS_MODE_SPECIFIC;
     m.colors_min = 1;
     m.colors_max = 1;
     m.colors.resize(1, ToRGBColor(0xFF, 0x00, 0x00));
+    m.brightness_min = 0;
+    m.brightness_max = 4;
+    m.brightness = 4;
     setup.modes.push_back(m);
 
     // Built-in hardware effects. PCAP-verified (all_modes.pcapng): the commit's
@@ -497,10 +501,13 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
         }
         if(e.has_speed)
         {
-            em.flags |= MODE_FLAG_HAS_SPEED;
-            em.speed_min = SPEED_SLOW;
-            em.speed_max = SPEED_FASTEST;
-            em.speed = SPEED_NORMAL;
+            em.flags |= MODE_FLAG_HAS_SPEED | MODE_FLAG_HAS_BRIGHTNESS;
+            em.speed_min = 0;
+            em.speed_max = 2;
+            em.speed = 1;
+            em.brightness_min = 0;
+            em.brightness_max = 4;
+            em.brightness = 4;
         }
         setup.modes.push_back(em);
     }
@@ -566,6 +573,21 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
         // Mode change: force fresh init + commit for the new mode.
         self->perkey_inited = false;
         unsigned int mode = self->CurrentMode();
+
+        // Read brightness/speed set by the OpenRGB UI (slider values).
+        if(self->virtual_controller) {
+            int idx = self->virtual_controller->GetActiveMode();
+            if(idx >= 0) {
+                unsigned int b = self->virtual_controller->GetModeBrightness((unsigned int)idx);
+                unsigned int s = self->virtual_controller->GetModeSpeed((unsigned int)idx);
+                // Brightness 0..4 -> commit byte[40] 0x30..0x34
+                self->current_brightness = (unsigned char)(0x30 + (b > 4 ? 4 : b));
+                // Speed 0..2 -> commit byte[59] 0x14/0x24/0x34
+                unsigned char speed_table[3] = {0x14, 0x24, 0x34};
+                if(s > 2) s = 2;
+                self->current_speed = speed_table[s];
+            }
+        }
 
         GK_LOG_INFO("DeviceUpdateMode: mode=0x%02X\n", mode);
 
