@@ -172,15 +172,34 @@ void OpenGK850WPlugin::SendInitCommands(bool full)
 
 unsigned int OpenGK850WPlugin::CurrentMode()
 {
-    // Map the virtual controller's active mode index back to our MODE_* values.
-    int idx = (virtual_controller) ? virtual_controller->GetActiveMode() : -1;
-    switch(idx)
+    // Resolve the active mode's value through the interface API (the
+    // RGBControllerInterface does not expose the modes vector directly).
+    if(virtual_controller)
     {
-        case 0:  return MODE_STATIC;    // Static
-        case 1:  return MODE_PER_KEY;   // Custom
-        case 2:  return MODE_OFF;       // Off
-        default: return current_mode;   // fallback to cached value
+        int idx = virtual_controller->GetActiveMode();
+        std::string name = virtual_controller->GetModeName((unsigned int)idx);
+
+        // Match by mode name - stable regardless of list order.
+        if(name == "Direct")        return MODE_PER_KEY;
+        if(name == "Static")        return MODE_STATIC;
+        if(name == "Off")           return MODE_OFF;
+
+        // Hardware effects: name -> effect ID lookup.
+        static const struct { const char* name; unsigned char id; } EFFECT_IDS[] = {
+            {"Breathing", 0x02}, {"Spectrum Cycle", 0x03}, {"Rainbow Wave", 0x04},
+            {"Rain", 0x05}, {"Double Spectrum", 0x06}, {"Water Drop", 0x07},
+            {"Twinkling Stars", 0x08}, {"Shadow", 0x09}, {"Snake", 0x0A},
+            {"Neon Wave", 0x0B}, {"Trail", 0x0C}, {"Sine Wave", 0x0D},
+            {"Scan", 0x0E}, {"Carousel", 0x0F}, {"Waterfall", 0x10},
+            {"Pulsing", 0x11}, {"Explosion", 0x12}, {"Collision", 0x13},
+            {"Flashing", 0x14},
+        };
+        for(const auto& e : EFFECT_IDS)
+        {
+            if(name == e.name) return e.id;
+        }
     }
+    return current_mode;   // fallback to cached value
 }
 
 void OpenGK850WPlugin::SyncModeFromController()
@@ -411,17 +430,20 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
     setup.type = DEVICE_TYPE_KEYBOARD;
     setup.flags = CONTROLLER_FLAGS_MANUALLY_CONFIGURABLE;
 
-    // Add modes
+    // Add modes - names follow the OpenRGB "Common Modes" convention:
+    // https://openrgb.org/wiki/doku.php?id=common_modes
     mode m;
 
-    m.name = "Custom";
+    // Direct: per-LED colors, no fade/flicker, not saved to device memory.
+    // Used by effect engines for software-driven effects.
+    m.name = "Direct";
     m.value = MODE_PER_KEY;
     m.flags = MODE_FLAG_HAS_PER_LED_COLOR;
     m.color_mode = MODE_COLORS_PER_LED;
     setup.modes.push_back(m);
 
-    // Direct (static color, no forced default)
-    m.name = "Direct";
+    // Static: whole device set to one static color (may flicker/save).
+    m.name = "Static";
     m.value = MODE_STATIC;
     m.flags = MODE_FLAG_HAS_MODE_SPECIFIC_COLOR;
     m.color_mode = MODE_COLORS_MODE_SPECIFIC;
@@ -432,27 +454,28 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
 
     // Built-in hardware effects. PCAP-verified (all_modes.pcapng): the commit's
     // mode byte selects the effect; UI order in the vendor app maps 1:1 to HW
-    // effect IDs 0x01..0x14. Names from text.xml (tc_kb_led1..20).
+    // effect IDs 0x01..0x14. Names mapped to Common OpenRGB Modes where they
+    // exist, vendor names kept otherwise.
     static const struct { const char* name; unsigned char id; bool has_color; bool has_speed; } EFFECTS[] = {
-        {"Breath",           0x02, true,  true},
-        {"Spectrum",         0x03, false, true},
-        {"Light-up Line",    0x04, true,  true},
-        {"Rain",             0x05, true,  true},
-        {"Double Transition",0x06, false, true},
-        {"Water Drop",       0x07, true,  true},
-        {"Twinkling Stars",  0x08, true,  true},
-        {"Shadow",           0x09, true,  true},
-        {"Snake",            0x0A, true,  true},
-        {"Neon Wave",        0x0B, true,  true},
-        {"Trail",            0x0C, true,  true},
-        {"Sine Wave",        0x0D, true,  true},
-        {"Scan",             0x0E, true,  true},
-        {"Carousel",         0x0F, true,  true},
-        {"Waterfall",        0x10, true,  true},
-        {"Pulsing",          0x11, true,  true},
-        {"Explosion",        0x12, true,  true},
-        {"Collision",        0x13, true,  true},
-        {"Flash",            0x14, true,  true},
+        {"Breathing",         0x02, true,  true},   /* vendor: Oddech          */
+        {"Spectrum Cycle",    0x03, false, true},   /* vendor: Przejście       */
+        {"Rainbow Wave",      0x04, true,  true},   /* vendor: Podświetl linię */
+        {"Rain",              0x05, true,  true},
+        {"Double Spectrum",   0x06, false, true},   /* vendor: Podwójne przejście */
+        {"Water Drop",        0x07, true,  true},
+        {"Twinkling Stars",   0x08, true,  true},
+        {"Shadow",            0x09, true,  true},
+        {"Snake",             0x0A, true,  true},
+        {"Neon Wave",         0x0B, true,  true},
+        {"Trail",             0x0C, true,  true},
+        {"Sine Wave",         0x0D, true,  true},
+        {"Scan",              0x0E, true,  true},
+        {"Carousel",          0x0F, true,  true},
+        {"Waterfall",         0x10, true,  true},
+        {"Pulsing",           0x11, true,  true},
+        {"Explosion",         0x12, true,  true},
+        {"Collision",         0x13, true,  true},
+        {"Flashing",          0x14, true,  true},   /* vendor: Błysk          */
     };
     for(const auto& e : EFFECTS)
     {

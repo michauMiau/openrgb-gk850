@@ -7,6 +7,9 @@
 #include <QMap>
 #include <QPlainTextEdit>
 #include <QScrollBar>
+#include <QMutex>
+#include <QMutexLocker>
+#include <QThread>
 #include <hidapi.h>
 
 // Number of LEDs (61 for 60% layout - GK850W is a 60% keyboard)
@@ -79,20 +82,36 @@ private:
     QPlainTextEdit* widget_debug_log = nullptr;  // Reference to UI debug log
 
     void AddDebug(const QString& msg) {
+        // Called from OpenRGB worker threads - guard against concurrent access.
+        QMutexLocker locker(&debug_mutex);
         debug_log += msg + "\n";
 
-        // Update UI if available: append and trim to the last 50 lines so the
-        // widget shows the newest entries (oldest are removed).
+        // Keep only the last 50 lines.
+        auto lines = debug_log.split('\n');
+        if(lines.size() > 50) {
+            lines = lines.mid(lines.size() - 50);
+            debug_log = lines.join('\n');
+        }
+
+        // Update UI only from the GUI thread; from worker threads just store
+        // the text (creating QObject children cross-thread is forbidden).
         if(widget_debug_log) {
-            widget_debug_log->setPlainText(debug_log);
-            auto lines = debug_log.split('\n');
-            if(lines.size() > 50) {
-                lines = lines.mid(lines.size() - 50);
-                debug_log = lines.join('\n');
+            if(QThread::currentThread() == widget_debug_log->thread()) {
                 widget_debug_log->setPlainText(debug_log);
+                widget_debug_log->verticalScrollBar()->setValue(
+                    widget_debug_log->verticalScrollBar()->maximum());
             }
-            widget_debug_log->verticalScrollBar()->setValue(
-                widget_debug_log->verticalScrollBar()->maximum());
+            else
+            {
+                pending_debug = debug_log;
+                QMetaObject::invokeMethod(widget_debug_log, [this]() {
+                    if(widget_debug_log) {
+                        widget_debug_log->setPlainText(pending_debug);
+                        widget_debug_log->verticalScrollBar()->setValue(
+                            widget_debug_log->verticalScrollBar()->maximum());
+                    }
+                }, Qt::QueuedConnection);
+            }
         }
     }
 
@@ -116,6 +135,8 @@ private:
     bool perkey_needs_commit = false;
     // UI checkbox: skip ALL init reports and commits (pure data stream test).
     bool skip_init_reports = false;
+    QMutex debug_mutex;
+    QString pending_debug;
 
     // Returns the currently active OpenRGB mode reading the controller
     unsigned int CurrentMode();
