@@ -210,6 +210,49 @@ void OpenGK850WPlugin::SendModeCommit(CommitType type)
     }
 }
 
+void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
+{
+    if(!dev_handle) return;
+
+    // PCAP-verified effect sequence (speeds_neon_wave_red.pcapng):
+    //   [0] init1 + init2
+    //   [1] 06 08 b8 color-data (RGB @ 29/30/31)
+    //   [2] 06 03 b6 commit with byte[17] = effect ID, byte[18]=0x20,
+    //       byte[19]=0x02, then the per-effect parameter block.
+    SendInitCommands(true);
+
+    unsigned char buf[REPORT_SIZE_LED];
+    memcpy(buf, GK_COLOR_DATA_ON, sizeof(GK_COLOR_DATA_ON));
+    buf[29] = RGBGetRValue(color);
+    buf[30] = RGBGetGValue(color);
+    buf[31] = RGBGetBValue(color);
+
+    int ret = hid_send_feature_report(dev_handle, buf, REPORT_SIZE_LED);
+    if(ret < 0)
+    {
+        GK_LOG_INFO("SendEffectPacket: color report failed (ret=%d)\n", ret);
+    }
+
+    // Commit with the effect ID patched into byte[17]. Template is the ON
+    // commit (byte[17]=0x01); effects use their own ID. Parameter block at
+    // [24..] comes from the template (vendor defaults).
+    unsigned char commit[REPORT_SIZE_LED];
+    memcpy(commit, GK_MODE_COMMIT_ON, REPORT_SIZE_LED);
+    commit[17] = effect_id;
+    commit[18] = 0x20;
+    commit[19] = 0x02;
+
+    ret = hid_send_feature_report(dev_handle, commit, REPORT_SIZE_LED);
+    if(ret < 0)
+    {
+        GK_LOG_INFO("SendEffectPacket(0x%02X): commit failed (ret=%d)\n", effect_id, ret);
+    }
+    else
+    {
+        AddDebug(QString("Effect 0x%1 applied").arg(effect_id, 2, 16));
+    }
+}
+
 void OpenGK850WPlugin::SendStaticColorPacket(RGBColor color)
 {
     if(!dev_handle) return;
@@ -371,20 +414,73 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
     // Add modes
     mode m;
 
-    m.name = "Static";
-    m.value = MODE_STATIC;
-    m.flags = MODE_FLAG_HAS_MODE_SPECIFIC_COLOR;
-    m.color_mode = MODE_COLORS_MODE_SPECIFIC;
-    m.colors_min = 1;
-    m.colors_max = 1;
-    m.colors.resize(1, ToRGBColor(0xFF, 0x00, 0x00)); // Red default
-    setup.modes.push_back(m);
-
     m.name = "Custom";
     m.value = MODE_PER_KEY;
     m.flags = MODE_FLAG_HAS_PER_LED_COLOR;
     m.color_mode = MODE_COLORS_PER_LED;
     setup.modes.push_back(m);
+
+    // Direct (static color, no forced default)
+    m.name = "Direct";
+    m.value = MODE_STATIC;
+    m.flags = MODE_FLAG_HAS_MODE_SPECIFIC_COLOR;
+    m.color_mode = MODE_COLORS_MODE_SPECIFIC;
+    m.colors_min = 1;
+    m.colors_max = 1;
+    m.colors.resize(1, ToRGBColor(0xFF, 0x00, 0x00));
+    setup.modes.push_back(m);
+
+    // Built-in hardware effects. PCAP-verified (all_modes.pcapng): the commit's
+    // mode byte selects the effect; UI order in the vendor app maps 1:1 to HW
+    // effect IDs 0x01..0x14. Names from text.xml (tc_kb_led1..20).
+    static const struct { const char* name; unsigned char id; bool has_color; bool has_speed; } EFFECTS[] = {
+        {"Breath",           0x02, true,  true},
+        {"Spectrum",         0x03, false, true},
+        {"Light-up Line",    0x04, true,  true},
+        {"Rain",             0x05, true,  true},
+        {"Double Transition",0x06, false, true},
+        {"Water Drop",       0x07, true,  true},
+        {"Twinkling Stars",  0x08, true,  true},
+        {"Shadow",           0x09, true,  true},
+        {"Snake",            0x0A, true,  true},
+        {"Neon Wave",        0x0B, true,  true},
+        {"Trail",            0x0C, true,  true},
+        {"Sine Wave",        0x0D, true,  true},
+        {"Scan",             0x0E, true,  true},
+        {"Carousel",         0x0F, true,  true},
+        {"Waterfall",        0x10, true,  true},
+        {"Pulsing",          0x11, true,  true},
+        {"Explosion",        0x12, true,  true},
+        {"Collision",        0x13, true,  true},
+        {"Flash",            0x14, true,  true},
+    };
+    for(const auto& e : EFFECTS)
+    {
+        mode em;
+        em.name  = e.name;
+        em.value = e.id;
+        em.flags = 0;
+        if(e.has_color)
+        {
+            em.flags |= MODE_FLAG_HAS_MODE_SPECIFIC_COLOR;
+            em.color_mode = MODE_COLORS_MODE_SPECIFIC;
+            em.colors_min = 1;
+            em.colors_max = 1;
+            em.colors.resize(1, ToRGBColor(0xFF, 0x00, 0x00));
+        }
+        else
+        {
+            em.color_mode = MODE_COLORS_NONE;
+        }
+        if(e.has_speed)
+        {
+            em.flags |= MODE_FLAG_HAS_SPEED;
+            em.speed_min = SPEED_SLOW;
+            em.speed_max = SPEED_FASTEST;
+            em.speed = SPEED_NORMAL;
+        }
+        setup.modes.push_back(em);
+    }
 
     m.name = "Off";
     m.value = MODE_OFF;
@@ -453,7 +549,7 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
         if(mode == MODE_STATIC)
         {
             // Get color from OpenRGB using proper API
-            RGBColor c = ToRGBColor(255, 0, 0); // Default to red
+            RGBColor c = ToRGBColor(0, 0, 0); // No forced default color
             
             if(self->virtual_controller) {
                 int active_mode_idx = self->virtual_controller->GetActiveMode();
@@ -461,24 +557,33 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
                 if(active_mode_idx >= 0) {
                     // Get the color for this mode
                     c = self->virtual_controller->GetModeColor(active_mode_idx, 0);
-                    
-                    // If black (all zeros), use red as default
-                    if(RGBGetRValue(c) == 0 && RGBGetGValue(c) == 0 && RGBGetBValue(c) == 0) {
-                        c = ToRGBColor(255, 0, 0);
-                    }
-                    
-                    self->AddDebug(QString("Static color: R=%1 G=%2 B=%3")
-                        .arg(RGBGetRValue(c))
-                        .arg(RGBGetGValue(c))
-                        .arg(RGBGetBValue(c)));
                 }
             }
-            
+
+            self->AddDebug(QString("Static color: R=%1 G=%2 B=%3")
+                .arg(RGBGetRValue(c))
+                .arg(RGBGetGValue(c))
+                .arg(RGBGetBValue(c)));
+
             self->SendStaticColorPacket(c);
         }
         else if(mode == MODE_PER_KEY)
         {
             self->SendPerKeyPacket();
+        }
+        else if(mode >= 0x02 && mode <= 0x14)
+        {
+            // Built-in hardware effect: color-data (if the effect takes a
+            // color) + commit with the effect ID as mode byte. Sequence
+            // verified in speeds_neon_wave_red.pcapng / all_modes.pcapng.
+            RGBColor c = ToRGBColor(0xFF, 0x00, 0x00);
+            if(self->virtual_controller) {
+                int idx = self->virtual_controller->GetActiveMode();
+                if(idx >= 0) {
+                    c = self->virtual_controller->GetModeColor(idx, 0);
+                }
+            }
+            self->SendEffectPacket(mode, c);
         }
         else
         {
