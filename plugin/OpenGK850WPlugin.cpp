@@ -635,6 +635,10 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
                 int idx = self->virtual_controller->GetActiveMode();
                 if(idx >= 0) {
                     c = self->virtual_controller->GetModeColor(idx, 0);
+                    if(c == ToRGBColor(0xFF, 0x00, 0x00))
+                    {
+                        c = self->virtual_controller->GetZoneColor(0, 0);
+                    }
                 }
             }
             self->SendEffectPacket(mode, c);
@@ -716,6 +720,14 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
                 int idx = self->virtual_controller->GetActiveMode();
                 if(idx >= 0) {
                     c = self->virtual_controller->GetModeColor(idx, 0);
+                    /* Fallback: if mode color still at init default (red),
+                     * use the first LED's color - the UI may paint LEDs
+                     * instead of mode colors depending on which wheel the
+                     * user picked from. */
+                    if(c == ToRGBColor(0xFF, 0x00, 0x00))
+                    {
+                        c = self->virtual_controller->GetZoneColor(0, 0);
+                    }
                 }
             }
             GK_LOG_INFO("DeviceUpdateMode: effect=0x%02X color R=%d G=%d B=%d bright=0x%02X speed=0x%02X\n",
