@@ -234,12 +234,13 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
     if(!dev_handle) return;
 
     // PCAP-verified effect sequence (speeds_neon_wave_red.pcapng):
-    //   [0] init1 + init2
-    //   [1] 06 08 b8 color-data (RGB @ 29/30/31)
-    //   [2] 06 03 b6 commit with byte[21] = effect ID (same field as the
-    //       static=0x01 / game=0x15 mode codes!), byte[40] = brightness
-    //       (0x31..0x34), byte[59] = speed (0x14 slow, 0x24 normal, 0x34 fast).
-    SendInitCommands(true);
+    //   [0] 06 08 b8 color-data (RGB @ 29/30/31)
+    //   [1] 06 03 b6 commit with byte[21] = effect ID (same field as the
+    //       static=0x01 / game=0x15 mode codes!), byte[39] = brightness
+    //       (0x31..0x34), byte[59] = speed (0x14/0x24/0x34/0x44).
+    // NOTE: the vendor app does NOT re-send init1/init2 on speed/brightness
+    // changes (neon_slow vs neon_fast: exactly one init per app session).
+    // Re-initializing resets the keyboard's engine and wipes the params.
 
     unsigned char buf[REPORT_SIZE_LED];
     memcpy(buf, GK_COLOR_DATA_ON, sizeof(GK_COLOR_DATA_ON));
@@ -266,7 +267,8 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
     }
     else
     {
-        AddDebug(QString("Effect 0x%1 applied").arg(effect_id, 2, 16));
+        GK_LOG_INFO("SendEffectPacket(0x%02X): applied, bright=0x%02X speed=0x%02X\n",
+                    effect_id, current_brightness, current_speed);
     }
 }
 
@@ -582,7 +584,7 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
                 unsigned int s = self->virtual_controller->GetModeSpeed((unsigned int)idx);
                 // Brightness 1..4 -> commit byte[39] 0x31..0x34
                 // (PCAP-verified: lowest=0x31, highest=0x34; no 0x30 level)
-                unsigned char bright_table[5] = {0x31, 0x31, 0x32, 0x33, 0x34};
+                static const unsigned char bright_table[5] = {0x31, 0x31, 0x32, 0x33, 0x34};
                 if(b > 4) b = 4;
                 self->current_brightness = bright_table[b];
                 // Speed 0..3 -> commit byte[59] 0x14/0x24/0x34/0x44
@@ -622,9 +624,8 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
         }
         else if(mode >= 0x02 && mode <= 0x14)
         {
-            // Built-in hardware effect: color-data (if the effect takes a
-            // color) + commit with the effect ID as mode byte. Sequence
-            // verified in speeds_neon_wave_red.pcapng / all_modes.pcapng.
+            // Built-in hardware effect: color-data + commit with the effect
+            // ID as mode byte. Sequence verified in speeds_neon_wave_red.pcapng.
             RGBColor c = ToRGBColor(0xFF, 0x00, 0x00);
             if(self->virtual_controller) {
                 int idx = self->virtual_controller->GetActiveMode();
@@ -632,6 +633,19 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
                     c = self->virtual_controller->GetModeColor(idx, 0);
                 }
             }
+            GK_LOG_INFO("DeviceUpdateMode: effect=0x%02X color R=%d G=%d B=%d bright=0x%02X speed=0x%02X\n",
+                        mode, RGBGetRValue(c), RGBGetGValue(c), RGBGetBValue(c),
+                        self->current_brightness, self->current_speed);
+            self->AddDebug(QString("Effect %1 (0x%2): R=%3 G=%4 B=%5, bright=%6, speed=%7")
+                .arg(self->virtual_controller ? QString::fromStdString(
+                    self->virtual_controller->GetModeName((unsigned int)
+                        self->virtual_controller->GetActiveMode())) : "?")
+                .arg(mode, 2, 16)
+                .arg(RGBGetRValue(c))
+                .arg(RGBGetGValue(c))
+                .arg(RGBGetBValue(c))
+                .arg((self->current_brightness & 0x0F))
+                .arg(((self->current_speed >> 4) & 0x07)));
             self->SendEffectPacket(mode, c);
         }
         else
