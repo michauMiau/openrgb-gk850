@@ -623,6 +623,21 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
             
             self->SendStaticColorPacket(c);
         }
+        else if(mode >= 0x02 && mode <= 0x14)
+        {
+            /* Color change while a hardware effect is active: OpenRGB calls
+             * UpdateLEDs (not UpdateMode) for color-only edits. Without this
+             * branch the keyboard keeps the template's baked color - that's
+             * why Snake stayed green and Explosion blue regardless of pick. */
+            RGBColor c = ToRGBColor(0xFF, 0x00, 0x00);
+            if(self->virtual_controller) {
+                int idx = self->virtual_controller->GetActiveMode();
+                if(idx >= 0) {
+                    c = self->virtual_controller->GetModeColor(idx, 0);
+                }
+            }
+            self->SendEffectPacket(mode, c);
+        }
     };
 
     setup.DeviceUpdateSingleLED = [](void* arg, int /*led_idx*/) {
