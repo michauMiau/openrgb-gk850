@@ -256,7 +256,7 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
     unsigned char commit[REPORT_SIZE_LED];
     memcpy(commit, GK_MODE_COMMIT_ON, REPORT_SIZE_LED);
     commit[21] = effect_id;   /* effect selector - same field as static/game */
-    commit[40] = current_brightness;
+    commit[39] = current_brightness;
     commit[59] = current_speed;
 
     ret = hid_send_feature_report(dev_handle, commit, REPORT_SIZE_LED);
@@ -503,7 +503,7 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
         {
             em.flags |= MODE_FLAG_HAS_SPEED | MODE_FLAG_HAS_BRIGHTNESS;
             em.speed_min = 0;
-            em.speed_max = 2;
+            em.speed_max = 3;
             em.speed = 1;
             em.brightness_min = 0;
             em.brightness_max = 4;
@@ -580,11 +580,13 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
             if(idx >= 0) {
                 unsigned int b = self->virtual_controller->GetModeBrightness((unsigned int)idx);
                 unsigned int s = self->virtual_controller->GetModeSpeed((unsigned int)idx);
-                // Brightness 0..4 -> commit byte[40] 0x30..0x34
+                // Brightness 0..4 -> commit byte[39] 0x30..0x34
+                // (PCAP-verified: white capture progression 0x31->0x34)
                 self->current_brightness = (unsigned char)(0x30 + (b > 4 ? 4 : b));
-                // Speed 0..2 -> commit byte[59] 0x14/0x24/0x34
-                unsigned char speed_table[3] = {0x14, 0x24, 0x34};
-                if(s > 2) s = 2;
+                // Speed 0..3 -> commit byte[59] 0x14/0x24/0x34/0x44
+                // (PCAP-verified: neon slowest=0x14, fastest=0x44)
+                static const unsigned char speed_table[4] = {0x14, 0x24, 0x34, 0x44};
+                if(s > 3) s = 3;
                 self->current_speed = speed_table[s];
             }
         }
