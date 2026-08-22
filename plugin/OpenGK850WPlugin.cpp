@@ -248,6 +248,19 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
     buf[30] = RGBGetGValue(color);
     buf[31] = RGBGetBValue(color);
 
+    // PCAP finding (snake_green / neon_slow): the vendor app fills the whole
+    // per-LED region of the color report with the chosen color (75+ triplets),
+    // not just [29:31]. The template's red palette at [8:28] is a test
+    // gradient; per-key triplets continue from byte 32. Fill from 32 to end
+    // with repeating R,G,B so effects actually render the picked color.
+    unsigned char rgb[3] = { RGBGetRValue(color), RGBGetGValue(color), RGBGetBValue(color) };
+    for(int i = 32; i < (int)REPORT_SIZE_LED - 2; i += 3)
+    {
+        buf[i]     = rgb[0];
+        buf[i + 1] = rgb[1];
+        buf[i + 2] = rgb[2];
+    }
+
     int ret = hid_send_feature_report(dev_handle, buf, REPORT_SIZE_LED);
     if(ret < 0)
     {
@@ -591,9 +604,10 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
             if(idx >= 0) {
                 unsigned int b = self->virtual_controller->GetModeBrightness((unsigned int)idx);
                 unsigned int s = self->virtual_controller->GetModeSpeed((unsigned int)idx);
-                // Brightness 1..4 -> commit byte[39] 0x31..0x34
-                // (PCAP-verified: lowest=0x31, highest=0x34; no 0x30 level)
-                static const unsigned char bright_table[5] = {0x31, 0x31, 0x32, 0x33, 0x34};
+                 // Brightness slider -> commit byte[39]. Hardware-verified:
+                // HIGHER byte = DIMMER on the keyboard (user-tested), so
+                // invert: slider 4 (max bright) -> 0x31, slider 0/1 -> 0x34.
+                static const unsigned char bright_table[5] = {0x34, 0x34, 0x33, 0x32, 0x31};
                 if(b > 4) b = 4;
                 self->current_brightness = bright_table[b];
                 // Speed 0..3 -> commit byte[59] 0x14/0x24/0x34/0x44
