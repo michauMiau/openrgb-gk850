@@ -9,6 +9,7 @@
 
 #include "OpenGK850WPlugin.h"
 #include "gk850_reports.h"
+#include "gk850_effect_colors.h"
 #include <QLabel>
 #include <QVBoxLayout>
 #include <QPushButton>
@@ -243,16 +244,26 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
     SendInitCommands(true);
 
     unsigned char buf[REPORT_SIZE_LED];
-    memcpy(buf, GK_COLOR_DATA_ON, sizeof(GK_COLOR_DATA_ON));
+    /* Per-effect COLOR templates: the 06 08 b8 report carries per-effect
+     * animation/palette data past byte 32 - one static template breaks
+     * effects whose frame differs (rainbow wave went black). Chosen color
+     * goes ONLY at [29:31]. */
+    const unsigned char* ctmpl = GK_COLOR_DATA_ON;
+    unsigned char eid_map2[GK_EFFECT_COLOR_COUNT] = {
+        0x10, 0x12, 0x14, 0x08, 0x09, 0x0A, 0x0B, 0x0E
+    };
+    for(unsigned char i = 0; i < GK_EFFECT_COLOR_COUNT; i++)
+    {
+        if(eid_map2[i] == effect_id)
+        {
+            ctmpl = GK_EFFECT_COLORS[i];
+            break;
+        }
+    }
+    memcpy(buf, ctmpl, REPORT_SIZE_LED);
     buf[29] = RGBGetRValue(color);
     buf[30] = RGBGetGValue(color);
     buf[31] = RGBGetBValue(color);
-
-    /* NOTE: chosen color goes ONLY at [29:31]. Earlier attempt filled the
-     * whole per-LED region from byte 32 - that CLOBBERS the palette/LED
-     * data and renders most effects black or random. Explosion (0x12)
-     * proves it: vendor writes blue ONLY at [29], and with the 83-frame +
-     * per-effect commit template it applies correctly. */
 
     int ret = hid_send_feature_report(dev_handle, buf, REPORT_SIZE_LED);
     if(ret < 0)
@@ -280,10 +291,14 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
     memcpy(commit, tmpl, REPORT_SIZE_LED);
     commit[21] = effect_id;
     /* Effect sweeps prove ONE byte [69] packs both params:
-     * high nibble = speed (1=slowest..4=fastest),
-     * low nibble  = brightness (1=lowest..3=highest). */
-    unsigned int bi = current_brightness & 0x0F; if(bi < 1) bi = 1;
-    commit[69] = (unsigned char)(((current_speed >> 4) & 0x0F) << 4 | (bi & 0x0F));
+     * high nibble = speed (1=slowest..4=fastest), low nibble = brightness
+     * (vendor lowest captured = 0x41). Clamp BOTH nibbles to 1..4 - invalid
+     * combos (e.g. 0x01) make the keyboard enter indicator modes instead
+     * (2.4GHz / Ctrl lock seen by user with brightness at minimum when the
+     * speed nibble defaulted to 1). */
+    unsigned int sn = (current_speed >> 4) & 0x0F; if(sn < 1) sn = 1; if(sn > 4) sn = 4;
+    unsigned int bi = current_brightness & 0x0F; if(bi < 1) bi = 1; if(bi > 4) bi = 4;
+    commit[69] = (unsigned char)((sn << 4) | bi);
 
     ret = hid_send_feature_report(dev_handle, commit, REPORT_SIZE_LED);
     if(ret < 0)
