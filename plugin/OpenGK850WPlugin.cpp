@@ -10,6 +10,7 @@
 #include "OpenGK850WPlugin.h"
 #include "gk850_reports.h"
 #include "gk850_effect_colors.h"
+#include "gk850_frames.h"
 #include <QLabel>
 #include <QVBoxLayout>
 #include <QPushButton>
@@ -234,14 +235,31 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
 {
     if(!dev_handle) return;
 
-    // PCAP-verified effect sequence (speeds_neon_wave_red.pcapng):
-    //   [0] init1 + init2   <- vendor DOES re-init on every change
-    //       (white brightness capture: init+color+commit per step;
-    //        neon_slow/fast: same). Keep the init!
-    //   [1] 06 08 b8 color-data (RGB @ 29/30/31)
-    //   [2] 06 03 b6 commit with byte[21] = effect ID, byte[39] = brightness
-    //       (0x31..0x34), byte[59] = speed (0x14/0x24/0x34/0x44).
+    // PCAP-verified effect sequence (every vendor effect capture):
+    //   [0] init1 + init2
+    //   [1] 06 83 b6 per-effect frame (animation data)
+    //   [2] 06 08 b8 color report (chosen RGB @ [29:31])
+    //   [3] 06 03 b6 commit ([21]=effect, [69]=packed speed|brightness)
     SendInitCommands(true);
+
+    /* Per-effect FRAME: the 06 83 b6 report carries per-key animation
+     * seed data unique to each effect. Sending snake's frame for every
+     * effect breaks them - use the matching template. */
+    unsigned char frm[REPORT_SIZE_LED];
+    const unsigned char* ftmpl = GK_EFFECT_FRAME;
+    unsigned char eid_map0[GK_EFFECT_FRAME_COUNT] = {
+        0x10, 0x12, 0x14, 0x08, 0x09, 0x0A, 0x0B, 0x0E
+    };
+    for(unsigned char i = 0; i < GK_EFFECT_FRAME_COUNT; i++)
+    {
+        if(eid_map0[i] == effect_id)
+        {
+            ftmpl = GK_EFFECT_FRAMES[i];
+            break;
+        }
+    }
+    memcpy(frm, ftmpl, REPORT_SIZE_LED);
+    hid_send_feature_report(dev_handle, frm, REPORT_SIZE_LED);
 
     unsigned char buf[REPORT_SIZE_LED];
     /* Per-effect COLOR templates: the 06 08 b8 report carries per-effect
