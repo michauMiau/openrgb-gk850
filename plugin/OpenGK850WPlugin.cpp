@@ -247,9 +247,7 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
      * effect breaks them - use the matching template. */
     unsigned char frm[REPORT_SIZE_LED];
     const unsigned char* ftmpl = GK_EFFECT_FRAME;
-    unsigned char eid_map0[GK_EFFECT_FRAME_COUNT] = {
-        0x10, 0x12, 0x14, 0x08, 0x09, 0x0A, 0x0B, 0x0E
-    };
+    unsigned char eid_map0[GK_EFFECT_FRAME_COUNT] = { 0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x0F,0x10,0x11,0x12,0x13,0x14 };
     for(unsigned char i = 0; i < GK_EFFECT_FRAME_COUNT; i++)
     {
         if(eid_map0[i] == effect_id)
@@ -267,9 +265,7 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
      * effects whose frame differs (rainbow wave went black). Chosen color
      * goes ONLY at [29:31]. */
     const unsigned char* ctmpl = GK_COLOR_DATA_ON;
-    unsigned char eid_map2[GK_EFFECT_COLOR_COUNT] = {
-        0x10, 0x12, 0x14, 0x08, 0x09, 0x0A, 0x0B, 0x0E
-    };
+    unsigned char eid_map2[GK_EFFECT_COLOR_COUNT] = { 0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x0F,0x10,0x11,0x12,0x13,0x14 };
     for(unsigned char i = 0; i < GK_EFFECT_COLOR_COUNT; i++)
     {
         if(eid_map2[i] == effect_id)
@@ -295,9 +291,7 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
      * likely validates against the effect id. Fall back to static template
      * for effects we have no capture of. */
     const unsigned char* tmpl = GK_MODE_COMMIT_ON;
-    unsigned char eid_map[GK_EFFECT_COMMIT_COUNT] = {
-        0x10, 0x12, 0x14, 0x08, 0x09, 0x0A, 0x0B, 0x0E
-    };
+    unsigned char eid_map[GK_EFFECT_COMMIT_COUNT] = { 0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x0F,0x10,0x11,0x12,0x13,0x14 };
     for(unsigned char i = 0; i < GK_EFFECT_COMMIT_COUNT; i++)
     {
         if(eid_map[i] == effect_id)
