@@ -260,21 +260,12 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
     hid_send_feature_report(dev_handle, frm, REPORT_SIZE_LED);
 
     unsigned char buf[REPORT_SIZE_LED];
-    /* Per-effect COLOR templates: the 06 08 b8 report carries per-effect
-     * animation/palette data past byte 32 - one static template breaks
-     * effects whose frame differs (rainbow wave went black). Chosen color
-     * goes ONLY at [29:31]. */
-    const unsigned char* ctmpl = GK_COLOR_DATA_ON;
-    unsigned char eid_map2[GK_EFFECT_COLOR_COUNT] = { 0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x0F,0x10,0x11,0x12,0x13,0x14 };
-    for(unsigned char i = 0; i < GK_EFFECT_COLOR_COUNT; i++)
-    {
-        if(eid_map2[i] == effect_id)
-        {
-            ctmpl = GK_EFFECT_COLORS[i];
-            break;
-        }
-    }
-    memcpy(buf, ctmpl, REPORT_SIZE_LED);
+    /* COLOR REPORT IS UNIVERSAL: in all_modes.pcapng every effect's
+     * 06 08 b8 report is byte-identical ([21]=0x00, white at [29:31]) -
+     * it carries NO per-effect data. The keyboard applies [29:31] to the
+     * active effect. The earlier "per-effect color templates" held stale
+     * animation junk that broke colors (explosion ignoring picks). */
+    memcpy(buf, GK_COLOR_DATA_ON, sizeof(GK_COLOR_DATA_ON));
     buf[29] = RGBGetRValue(color);
     buf[30] = RGBGetGValue(color);
     buf[31] = RGBGetBValue(color);
