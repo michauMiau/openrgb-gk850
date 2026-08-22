@@ -268,11 +268,27 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
     }
 
     unsigned char commit[REPORT_SIZE_LED];
-    memcpy(commit, GK_MODE_COMMIT_ON, REPORT_SIZE_LED);
-    commit[21] = effect_id;   /* effect selector - same field as static/game */
-    /* NEW PCAPs (effect sweeps, effect 0x10): ONE byte [69] encodes BOTH
-     * params: high nibble = speed (1=slowest..4=fastest -> 0x14..0x44),
-     * low nibble = brightness (1=lowest..3+=highest -> 0x41..0x43). */
+    /* Per-effect commit templates from vendor PCAPs - each effect has a
+     * unique 7-byte signature at {52,54,56,58,64,72,76} that the keyboard
+     * likely validates against the effect id. Fall back to static template
+     * for effects we have no capture of. */
+    const unsigned char* tmpl = GK_MODE_COMMIT_ON;
+    unsigned char eid_map[GK_EFFECT_COMMIT_COUNT] = {
+        0x10, 0x12, 0x14, 0x08, 0x09, 0x0A, 0x0B, 0x0E
+    };
+    for(unsigned char i = 0; i < GK_EFFECT_COMMIT_COUNT; i++)
+    {
+        if(eid_map[i] == effect_id)
+        {
+            tmpl = GK_EFFECT_COMMITS[i];
+            break;
+        }
+    }
+    memcpy(commit, tmpl, REPORT_SIZE_LED);
+    commit[21] = effect_id;
+    /* Effect sweeps prove ONE byte [69] packs both params:
+     * high nibble = speed (1=slowest..4=fastest),
+     * low nibble  = brightness (1=lowest..3=highest). */
     unsigned int bi = current_brightness & 0x0F; if(bi < 1) bi = 1;
     commit[69] = (unsigned char)(((current_speed >> 4) & 0x0F) << 4 | (bi & 0x0F));
 
