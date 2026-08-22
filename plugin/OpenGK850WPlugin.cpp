@@ -270,8 +270,11 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
     unsigned char commit[REPORT_SIZE_LED];
     memcpy(commit, GK_MODE_COMMIT_ON, REPORT_SIZE_LED);
     commit[21] = effect_id;   /* effect selector - same field as static/game */
-    commit[39] = current_brightness;
-    commit[59] = current_speed;
+    /* NEW PCAPs (effect sweeps, effect 0x10): ONE byte [69] encodes BOTH
+     * params: high nibble = speed (1=slowest..4=fastest -> 0x14..0x44),
+     * low nibble = brightness (1=lowest..3+=highest -> 0x41..0x43). */
+    unsigned int bi = current_brightness & 0x0F; if(bi < 1) bi = 1;
+    commit[69] = (unsigned char)(((current_speed >> 4) & 0x0F) << 4 | (bi & 0x0F));
 
     ret = hid_send_feature_report(dev_handle, commit, REPORT_SIZE_LED);
     if(ret < 0)
@@ -604,10 +607,11 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
             if(idx >= 0) {
                 unsigned int b = self->virtual_controller->GetModeBrightness((unsigned int)idx);
                 unsigned int s = self->virtual_controller->GetModeSpeed((unsigned int)idx);
-                 // Brightness slider -> commit byte[39]. Hardware-verified:
-                // HIGHER byte = DIMMER on the keyboard (user-tested), so
-                // invert: slider 4 (max bright) -> 0x31, slider 0/1 -> 0x34.
-                static const unsigned char bright_table[5] = {0x34, 0x34, 0x33, 0x32, 0x31};
+                // NEW PCAPs (effect brightness/speed sweeps, effect 0x10):
+                // for EFFECTS both params live in commit byte [69]:
+                //   brightness: 0x43=highest, 0x42, 0x41=lowest (4 lvls)
+                //   speed:      0x34, 0x24, 0x14 (slowest) - 0x44 fastest
+                static const unsigned char bright_table[5] = {0x44, 0x44, 0x43, 0x42, 0x41};
                 if(b > 4) b = 4;
                 self->current_brightness = bright_table[b];
                 // Speed 0..3 -> commit byte[59] 0x14/0x24/0x34/0x44
