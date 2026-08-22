@@ -303,8 +303,17 @@ void OpenGK850WPlugin::SendStaticColorPacket(RGBColor color)
         AddDebug(QString("Color data sent OK (%1 bytes)").arg(REPORT_SIZE_LED));
     }
 
-    // Commit the change with the static-on mode code (byte [21]=0x01).
-    SendModeCommit(COMMIT_ON);
+    // Commit with static-on mode code AND current brightness (byte [39]),
+    // so the brightness slider also works in Static mode.
+    unsigned char commit[REPORT_SIZE_LED];
+    memcpy(commit, GK_MODE_COMMIT_ON, REPORT_SIZE_LED);
+    commit[39] = current_brightness;
+
+    ret = hid_send_feature_report(dev_handle, commit, REPORT_SIZE_LED);
+    if(ret < 0)
+    {
+        GK_LOG_INFO("SendStaticColorPacket: commit failed (ret=%d)\n", ret);
+    }
 }
 
 void OpenGK850WPlugin::SendPerKeyPacket()
