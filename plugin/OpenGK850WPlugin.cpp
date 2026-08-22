@@ -234,13 +234,13 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
     if(!dev_handle) return;
 
     // PCAP-verified effect sequence (speeds_neon_wave_red.pcapng):
-    //   [0] 06 08 b8 color-data (RGB @ 29/30/31)
-    //   [1] 06 03 b6 commit with byte[21] = effect ID (same field as the
-    //       static=0x01 / game=0x15 mode codes!), byte[39] = brightness
+    //   [0] init1 + init2   <- vendor DOES re-init on every change
+    //       (white brightness capture: init+color+commit per step;
+    //        neon_slow/fast: same). Keep the init!
+    //   [1] 06 08 b8 color-data (RGB @ 29/30/31)
+    //   [2] 06 03 b6 commit with byte[21] = effect ID, byte[39] = brightness
     //       (0x31..0x34), byte[59] = speed (0x14/0x24/0x34/0x44).
-    // NOTE: the vendor app does NOT re-send init1/init2 on speed/brightness
-    // changes (neon_slow vs neon_fast: exactly one init per app session).
-    // Re-initializing resets the keyboard's engine and wipes the params.
+    SendInitCommands(true);
 
     unsigned char buf[REPORT_SIZE_LED];
     memcpy(buf, GK_COLOR_DATA_ON, sizeof(GK_COLOR_DATA_ON));
