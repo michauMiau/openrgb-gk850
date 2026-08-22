@@ -257,6 +257,20 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
         }
     }
     memcpy(frm, ftmpl, REPORT_SIZE_LED);
+    /* The FRAME must carry the same custom-color enable flags and slider
+     * values as the commit - vendor's colored sessions have them in BOTH
+     * reports; a default-state frame re-arms the built-in palette and the
+     * picked color is ignored. */
+    frm[21] = effect_id;
+    frm[40] = 0x07;
+    frm[46] = 0x07;
+    frm[58] = 0x07;
+    frm[76] = 0x00;
+    {
+        unsigned int lvl2 = current_brightness & 0x0F; if(lvl2 < 1) lvl2 = 1; if(lvl2 > 4) lvl2 = 4;
+        unsigned int sn2 = (current_speed >> 4) & 0x0F; if(sn2 < 1) sn2 = 1; if(sn2 > 4) sn2 = 4;
+        frm[69] = (unsigned char)((sn2 << 4) | lvl2);
+    }
     hid_send_feature_report(dev_handle, frm, REPORT_SIZE_LED);
 
     unsigned char buf[REPORT_SIZE_LED];
