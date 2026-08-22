@@ -580,9 +580,11 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
             if(idx >= 0) {
                 unsigned int b = self->virtual_controller->GetModeBrightness((unsigned int)idx);
                 unsigned int s = self->virtual_controller->GetModeSpeed((unsigned int)idx);
-                // Brightness 0..4 -> commit byte[39] 0x30..0x34
-                // (PCAP-verified: white capture progression 0x31->0x34)
-                self->current_brightness = (unsigned char)(0x30 + (b > 4 ? 4 : b));
+                // Brightness 1..4 -> commit byte[39] 0x31..0x34
+                // (PCAP-verified: lowest=0x31, highest=0x34; no 0x30 level)
+                unsigned char bright_table[5] = {0x31, 0x31, 0x32, 0x33, 0x34};
+                if(b > 4) b = 4;
+                self->current_brightness = bright_table[b];
                 // Speed 0..3 -> commit byte[59] 0x14/0x24/0x34/0x44
                 // (PCAP-verified: neon slowest=0x14, fastest=0x44)
                 static const unsigned char speed_table[4] = {0x14, 0x24, 0x34, 0x44};
