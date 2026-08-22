@@ -248,18 +248,11 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
     buf[30] = RGBGetGValue(color);
     buf[31] = RGBGetBValue(color);
 
-    // PCAP finding (snake_green / neon_slow): the vendor app fills the whole
-    // per-LED region of the color report with the chosen color (75+ triplets),
-    // not just [29:31]. The template's red palette at [8:28] is a test
-    // gradient; per-key triplets continue from byte 32. Fill from 32 to end
-    // with repeating R,G,B so effects actually render the picked color.
-    unsigned char rgb[3] = { RGBGetRValue(color), RGBGetGValue(color), RGBGetBValue(color) };
-    for(int i = 32; i < (int)REPORT_SIZE_LED - 2; i += 3)
-    {
-        buf[i]     = rgb[0];
-        buf[i + 1] = rgb[1];
-        buf[i + 2] = rgb[2];
-    }
+    /* NOTE: chosen color goes ONLY at [29:31]. Earlier attempt filled the
+     * whole per-LED region from byte 32 - that CLOBBERS the palette/LED
+     * data and renders most effects black or random. Explosion (0x12)
+     * proves it: vendor writes blue ONLY at [29], and with the 83-frame +
+     * per-effect commit template it applies correctly. */
 
     int ret = hid_send_feature_report(dev_handle, buf, REPORT_SIZE_LED);
     if(ret < 0)
