@@ -293,6 +293,14 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
     }
     memcpy(commit, tmpl, REPORT_SIZE_LED);
     commit[21] = effect_id;
+    /* Custom-color enable flags (PCAP rule: colored sessions across ALL
+     * effects have 40=46=58=0x07 and 76=0x00; default sessions are inverse).
+     * Without these the keyboard ignores [29:31] and uses its built-in
+     * palette - that's why effects ignored the picked color. */
+    commit[40] = 0x07;
+    commit[46] = 0x07;
+    commit[58] = 0x07;
+    commit[76] = 0x00;
     /* Effect sweeps prove ONE byte [69] packs both params:
      * high nibble = speed (1=slowest..4=fastest), low nibble = brightness
      * (vendor lowest captured = 0x41). Clamp BOTH nibbles to 1..4 - invalid
@@ -346,11 +354,19 @@ void OpenGK850WPlugin::SendStaticColorPacket(RGBColor color)
         AddDebug(QString("Color data sent OK (%1 bytes)").arg(REPORT_SIZE_LED));
     }
 
-    // Commit with static-on mode code AND current brightness (byte [39]),
-    // so the brightness slider also works in Static mode.
+    // Commit with static-on mode code AND current brightness (byte [39]).
+    // STATIC uses its own scale: PCAP-verified 0x34=highest, 0x31=lowest
+    // (vendor static_blue captures). The effect-scale [69] nibbles don't
+    // apply here - map from the effect value to keep the slider natural.
     unsigned char commit[REPORT_SIZE_LED];
     memcpy(commit, GK_MODE_COMMIT_ON, REPORT_SIZE_LED);
-    commit[39] = current_brightness;
+    {
+        /* invert effect-scale low nibble (1=dim..4=bright) back to the
+         * static scale where HIGHER byte = brighter per vendor captures */
+        unsigned int lvl = current_brightness & 0x0F; if(lvl < 1) lvl = 1; if(lvl > 4) lvl = 4;
+        static const unsigned char static_scale[5] = {0, 0x31, 0x32, 0x33, 0x34};
+        commit[39] = static_scale[lvl];
+    }
 
     ret = hid_send_feature_report(dev_handle, commit, REPORT_SIZE_LED);
     if(ret < 0)
