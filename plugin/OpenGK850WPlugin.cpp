@@ -253,7 +253,9 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
     buf[29] = RGBGetRValue(color);
     buf[30] = RGBGetGValue(color);
     buf[31] = RGBGetBValue(color);
-    hid_send_feature_report(dev_handle, buf, REPORT_SIZE_LED);
+    int r1 = hid_send_feature_report(dev_handle, buf, REPORT_SIZE_LED);
+    GK_LOG_INFO("SendEffectPacket(%02X): color report ret=%d\n", effect_id, r1);
+    AddDebug(QString("Eff %1: color ret=%2").arg(effect_id, 2, 16).arg(r1));
 
     const unsigned char* tmpl = nullptr;
     for(unsigned char k = 0; k < GK_EFFECT_COMMIT_COUNT; k++)
@@ -278,7 +280,15 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
         unsigned int sn3 = (current_speed >> 4) & 0x0F; if(sn3 < 1) sn3 = 1; if(sn3 > 4) sn3 = 4;
         commit[69] = (unsigned char)((sn3 << 4) | lvl3);
     }
-    hid_send_feature_report(dev_handle, commit, REPORT_SIZE_LED);
+    int r2 = hid_send_feature_report(dev_handle, commit, REPORT_SIZE_LED);
+    GK_LOG_INFO("SendEffectPacket(%02X): commit ret=%d flags=%02x%02x%02x%02x c=%02x%02x%02x\n",
+                effect_id, r2, commit[40], commit[46], commit[58], commit[76],
+                commit[29], commit[30], commit[31]);
+    AddDebug(QString("Eff %1: commit ret=%2 fl=%3%4%5%6 c=%7,%8,%9")
+        .arg(effect_id, 2, 16).arg(r2)
+        .arg(commit[40], 2, 16, QChar('0')).arg(commit[46], 2, 16, QChar('0'))
+        .arg(commit[58], 2, 16, QChar('0')).arg(commit[76], 2, 16, QChar('0'))
+        .arg(RGBGetRValue(color)).arg(RGBGetGValue(color)).arg(RGBGetBValue(color)));
 }
 
 
