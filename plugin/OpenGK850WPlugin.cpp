@@ -281,8 +281,8 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
         frm[39] = sscale2[lvl2];
         frm[59] = current_speed;
     }
-    frm[21] = effect_id;   /* set AFTER flag patch; frame carries effect id */
-    hid_send_feature_report(dev_handle, frm, FRAME_LEN);
+    frm[21] = effect_id;
+    hid_send_feature_report(dev_handle, frm, REPORT_SIZE_LED);
 
     unsigned char buf[REPORT_SIZE_LED];
     /* COLOR REPORT IS UNIVERSAL: in all_modes.pcapng every effect's
