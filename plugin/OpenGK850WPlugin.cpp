@@ -270,6 +270,9 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
         unsigned int lvl2 = current_brightness & 0x0F; if(lvl2 < 1) lvl2 = 1; if(lvl2 > 4) lvl2 = 4;
         unsigned int sn2 = (current_speed >> 4) & 0x0F; if(sn2 < 1) sn2 = 1; if(sn2 > 4) sn2 = 4;
         frm[69] = (unsigned char)((sn2 << 4) | lvl2);
+        static const unsigned char sscale2[5] = {0, 0x31, 0x32, 0x33, 0x34};
+        frm[39] = sscale2[lvl2];
+        frm[59] = current_speed;
     }
     hid_send_feature_report(dev_handle, frm, REPORT_SIZE_LED);
 
@@ -315,6 +318,15 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
     commit[46] = 0x07;
     commit[58] = 0x07;
     commit[76] = 0x00;
+    /* Vendor colored sessions carry slider state in BOTH layouts:
+     * old captures use [39]=static-scale brightness and [59]=speed,
+     * sweep captures use [69]=(speed_nib<<4|bright_nib). Write all. */
+    {
+        unsigned int lvl3 = current_brightness & 0x0F; if(lvl3 < 1) lvl3 = 1; if(lvl3 > 4) lvl3 = 4;
+        static const unsigned char sscale[5] = {0, 0x31, 0x32, 0x33, 0x34};
+        commit[39] = sscale[lvl3];
+        commit[59] = current_speed;
+    }
     /* Effect sweeps prove ONE byte [69] packs both params:
      * high nibble = speed (1=slowest..4=fastest), low nibble = brightness
      * (vendor lowest captured = 0x41). Clamp BOTH nibbles to 1..4 - invalid
