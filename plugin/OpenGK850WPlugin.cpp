@@ -971,13 +971,13 @@ OpenRGBPluginInfo OpenGK850WPlugin::GetPluginInfo()
 {
     OpenRGBPluginInfo info;
     info.Name = "GK850W";
-    info.Description = "Virtual controller for GK850W keyboard - no main repo patch needed";
-    info.Version = "3.0.0";
+    info.Description = "Plugin implementing support for the GK850W keyboard";
+    info.Version = "4.0.0";
     info.Commit = "local-build";
-    info.URL = "";
+    info.URL = "https://github.com/michauMiau/openrgb-gk850";
     info.Location = OPENRGB_PLUGIN_LOCATION_TOP;
     info.Label = "GK850W";
-    info.ProtocolVersion = 6;
+    info.ProtocolVersion = 5;
     return info;
 }
 
