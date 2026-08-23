@@ -290,6 +290,14 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
     buf[30] = RGBGetGValue(color);
     buf[31] = RGBGetBValue(color);
 
+    /* THE MISSING REPORT: vendor sends the color TWICE in effect sessions -
+     * once as [06 88 00 ...] (effects read THIS one) and once as
+     * [06 08 b8 ...]. Byte-identical apart from the 3-byte header. */
+    unsigned char buf88[REPORT_SIZE_LED];
+    memcpy(buf88, buf, REPORT_SIZE_LED);
+    buf88[0] = 0x06; buf88[1] = 0x88; buf88[2] = 0x00;
+    hid_send_feature_report(dev_handle, buf88, REPORT_SIZE_LED);
+
     int ret = hid_send_feature_report(dev_handle, buf, REPORT_SIZE_LED);
     if(ret < 0)
     {
@@ -368,6 +376,14 @@ void OpenGK850WPlugin::SendStaticColorPacket(RGBColor color)
     buf[29] = RGBGetRValue(color);
     buf[30] = RGBGetGValue(color);
     buf[31] = RGBGetBValue(color);
+
+    /* THE MISSING REPORT: vendor sends the color TWICE in effect sessions -
+     * once as [06 88 00 ...] (effects read THIS one) and once as
+     * [06 08 b8 ...]. Byte-identical apart from the 3-byte header. */
+    unsigned char buf88[REPORT_SIZE_LED];
+    memcpy(buf88, buf, REPORT_SIZE_LED);
+    buf88[0] = 0x06; buf88[1] = 0x88; buf88[2] = 0x00;
+    hid_send_feature_report(dev_handle, buf88, REPORT_SIZE_LED);
 
     GK_LOG_INFO("SendStaticColorPacket: R=%d G=%d B=%d\n", RGBGetRValue(color), RGBGetGValue(color), RGBGetBValue(color));
     AddDebug(QString("Static: R=%1 G=%2 B=%3").arg(RGBGetRValue(color)).arg(RGBGetGValue(color)).arg(RGBGetBValue(color)));
