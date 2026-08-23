@@ -260,6 +260,10 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
     memcpy(frm, ftmpl, REPORT_SIZE_LED);
     /* init2 goes AFTER the frame (vendor order), before the color report */
     hid_send_feature_report(dev_handle, GK_INIT_2, sizeof(GK_INIT_2));
+    /* CRITICAL: the frame is only 262 BYTES on the wire (USBPcap record
+     * sizes prove it) - sending the full 1032B buffer confuses the
+     * keyboard's report parser and subsequent reports get misread. */
+    const unsigned int FRAME_LEN = 262;
     /* The FRAME must carry the same custom-color enable flags and slider
      * values as the commit - vendor's colored sessions have them in BOTH
      * reports; a default-state frame re-arms the built-in palette and the
@@ -277,7 +281,8 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
         frm[39] = sscale2[lvl2];
         frm[59] = current_speed;
     }
-    hid_send_feature_report(dev_handle, frm, REPORT_SIZE_LED);
+    frm[21] = effect_id;   /* set AFTER flag patch; frame carries effect id */
+    hid_send_feature_report(dev_handle, frm, FRAME_LEN);
 
     unsigned char buf[REPORT_SIZE_LED];
     /* COLOR REPORT IS UNIVERSAL: in all_modes.pcapng every effect's
