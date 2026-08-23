@@ -235,135 +235,52 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
 {
     if(!dev_handle) return;
 
-    // PCAP-verified effect sequence (EVERY vendor effect capture):
-    //   [0] init1 (05 83 b6)
-    //   [1] 06 83 b6 per-effect frame
-    //   [2] init2 (05 88 b8)  <- BETWEEN frame and color, not first!
-    //   [3] 06 08 b8 color report (chosen RGB @ [29:31])
-    //   [4] 06 03 b6 commit
+    /* DEFINITIVE protocol (USB setup-packet decode of every vendor
+     * capture): an effect/color change is exactly FOUR feature writes:
+     *   1. SET_REPORT ID5 "05 83 b6"        (init1)
+     *   2. SET_REPORT ID5 "05 88 b8"        (init2)
+     *   3. SET_REPORT ID6 "06 08 b8" + color @ [29:31]
+     *   4. SET_REPORT ID6 "06 03 b6" commit with effect id @ [21],
+     *      custom-color flags [40]=[46]=[58]=07 / [76]=00 and slider
+     *      state at [39]/[59]/[69].
+     * The "06 83 b6 frame" and "06 88 xx" records in pcaps are GET_REPORT
+     * readbacks (bmRequestType=A1), never written by the vendor app. */
     hid_send_feature_report(dev_handle, GK_INIT_1, sizeof(GK_INIT_1));
-
-    /* Per-effect FRAME: the 06 83 b6 report carries per-key animation
-     * seed data unique to each effect. Sending snake's frame for every
-     * effect breaks them - use the matching template. */
-    unsigned char frm[REPORT_SIZE_LED];
-    const unsigned char* ftmpl = GK_EFFECT_FRAME;
-    unsigned char eid_map0[GK_EFFECT_FRAME_COUNT] = { 0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x0F,0x10,0x11,0x12,0x13,0x14 };
-    for(unsigned char i = 0; i < GK_EFFECT_FRAME_COUNT; i++)
-    {
-        if(eid_map0[i] == effect_id)
-        {
-            ftmpl = GK_EFFECT_FRAMES[i];
-            break;
-        }
-    }
-    memcpy(frm, ftmpl, REPORT_SIZE_LED);
-    /* init2 goes AFTER the frame (vendor order), before the color report */
     hid_send_feature_report(dev_handle, GK_INIT_2, sizeof(GK_INIT_2));
-    /* CRITICAL: the frame is only 262 BYTES on the wire (USBPcap record
-     * sizes prove it) - sending the full 1032B buffer confuses the
-     * keyboard's report parser and subsequent reports get misread. */
-    const unsigned int FRAME_LEN = 262;
-    /* The FRAME must carry the same custom-color enable flags and slider
-     * values as the commit - vendor's colored sessions have them in BOTH
-     * reports; a default-state frame re-arms the built-in palette and the
-     * picked color is ignored. */
-    frm[21] = effect_id;
-    frm[40] = 0x07;
-    frm[46] = 0x07;
-    frm[58] = 0x07;
-    frm[76] = 0x00;
-    {
-        unsigned int lvl2 = current_brightness & 0x0F; if(lvl2 < 1) lvl2 = 1; if(lvl2 > 4) lvl2 = 4;
-        unsigned int sn2 = (current_speed >> 4) & 0x0F; if(sn2 < 1) sn2 = 1; if(sn2 > 4) sn2 = 4;
-        frm[69] = (unsigned char)((sn2 << 4) | lvl2);
-        static const unsigned char sscale2[5] = {0, 0x34, 0x33, 0x32, 0x31};
-        frm[39] = sscale2[lvl2];
-        frm[59] = current_speed;
-    }
-    frm[21] = effect_id;
-    hid_send_feature_report(dev_handle, frm, REPORT_SIZE_LED);
 
     unsigned char buf[REPORT_SIZE_LED];
-    /* COLOR REPORT IS UNIVERSAL: in all_modes.pcapng every effect's
-     * 06 08 b8 report is byte-identical ([21]=0x00, white at [29:31]) -
-     * it carries NO per-effect data. The keyboard applies [29:31] to the
-     * active effect. The earlier "per-effect color templates" held stale
-     * animation junk that broke colors (explosion ignoring picks). */
     memcpy(buf, GK_COLOR_DATA_ON, sizeof(GK_COLOR_DATA_ON));
     buf[29] = RGBGetRValue(color);
     buf[30] = RGBGetGValue(color);
     buf[31] = RGBGetBValue(color);
+    hid_send_feature_report(dev_handle, buf, REPORT_SIZE_LED);
 
-    /* THE MISSING REPORT: vendor sends the color TWICE in effect sessions -
-     * once as [06 88 00 ...] (effects read THIS one) and once as
-     * [06 08 b8 ...]. Byte-identical apart from the 3-byte header. */
-    unsigned char buf88[REPORT_SIZE_LED];
-    memcpy(buf88, buf, REPORT_SIZE_LED);
-    buf88[0] = 0x06; buf88[1] = 0x88; buf88[2] = 0x00;
-    hid_send_feature_report(dev_handle, buf88, REPORT_SIZE_LED);
-
-    int ret = hid_send_feature_report(dev_handle, buf, REPORT_SIZE_LED);
-    if(ret < 0)
+    const unsigned char* tmpl = nullptr;
+    for(unsigned char k = 0; k < GK_EFFECT_COMMIT_COUNT; k++)
     {
-        GK_LOG_INFO("SendEffectPacket: color report failed (ret=%d)\n", ret);
+        unsigned char map_id[] = { 0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,
+            0x0A,0x0B,0x0C,0x0D,0x0E,0x0F,0x10,0x11,0x12,0x13,0x14 };
+        if(map_id[k] == effect_id) { tmpl = GK_EFFECT_COMMITS[k]; break; }
     }
-
+    if(!tmpl) tmpl = GK_EFFECT_COMMITS[0];
     unsigned char commit[REPORT_SIZE_LED];
-    /* Per-effect commit templates from vendor PCAPs - each effect has a
-     * unique 7-byte signature at {52,54,56,58,64,72,76} that the keyboard
-     * likely validates against the effect id. Fall back to static template
-     * for effects we have no capture of. */
-    const unsigned char* tmpl = GK_MODE_COMMIT_ON;
-    unsigned char eid_map[GK_EFFECT_COMMIT_COUNT] = { 0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x0F,0x10,0x11,0x12,0x13,0x14 };
-    for(unsigned char i = 0; i < GK_EFFECT_COMMIT_COUNT; i++)
-    {
-        if(eid_map[i] == effect_id)
-        {
-            tmpl = GK_EFFECT_COMMITS[i];
-            break;
-        }
-    }
     memcpy(commit, tmpl, REPORT_SIZE_LED);
     commit[21] = effect_id;
-    /* Custom-color enable flags (PCAP rule: colored sessions across ALL
-     * effects have 40=46=58=0x07 and 76=0x00; default sessions are inverse).
-     * Without these the keyboard ignores [29:31] and uses its built-in
-     * palette - that's why effects ignored the picked color. */
     commit[40] = 0x07;
     commit[46] = 0x07;
     commit[58] = 0x07;
     commit[76] = 0x00;
-    /* Vendor colored sessions carry slider state in BOTH layouts:
-     * old captures use [39]=static-scale brightness and [59]=speed,
-     * sweep captures use [69]=(speed_nib<<4|bright_nib). Write all. */
     {
         unsigned int lvl3 = current_brightness & 0x0F; if(lvl3 < 1) lvl3 = 1; if(lvl3 > 4) lvl3 = 4;
-        static const unsigned char sscale[5] = {0, 0x34, 0x33, 0x32, 0x31}; /* 0x31 = brightest (user-verified) */
+        static const unsigned char sscale[5] = {0, 0x34, 0x33, 0x32, 0x31};
         commit[39] = sscale[lvl3];
         commit[59] = current_speed;
+        unsigned int sn3 = (current_speed >> 4) & 0x0F; if(sn3 < 1) sn3 = 1; if(sn3 > 4) sn3 = 4;
+        commit[69] = (unsigned char)((sn3 << 4) | lvl3);
     }
-    /* Effect sweeps prove ONE byte [69] packs both params:
-     * high nibble = speed (1=slowest..4=fastest), low nibble = brightness
-     * (vendor lowest captured = 0x41). Clamp BOTH nibbles to 1..4 - invalid
-     * combos (e.g. 0x01) make the keyboard enter indicator modes instead
-     * (2.4GHz / Ctrl lock seen by user with brightness at minimum when the
-     * speed nibble defaulted to 1). */
-    unsigned int sn = (current_speed >> 4) & 0x0F; if(sn < 1) sn = 1; if(sn > 4) sn = 4;
-    unsigned int bi = current_brightness & 0x0F; if(bi < 1) bi = 1; if(bi > 4) bi = 4;
-    commit[69] = (unsigned char)((sn << 4) | bi);
-
-    ret = hid_send_feature_report(dev_handle, commit, REPORT_SIZE_LED);
-    if(ret < 0)
-    {
-        GK_LOG_INFO("SendEffectPacket(0x%02X): commit failed (ret=%d)\n", effect_id, ret);
-    }
-    else
-    {
-        GK_LOG_INFO("SendEffectPacket(0x%02X): applied, bright=0x%02X speed=0x%02X\n",
-                    effect_id, current_brightness, current_speed);
-    }
+    hid_send_feature_report(dev_handle, commit, REPORT_SIZE_LED);
 }
+
 
 void OpenGK850WPlugin::SendStaticColorPacket(RGBColor color)
 {
