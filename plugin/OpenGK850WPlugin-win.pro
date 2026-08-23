@@ -11,7 +11,7 @@ isEmpty(OPENRGB_ROOT): OPENRGB_ROOT = $$PWD/../../OpenRGB
 isEmpty(HIDAPI_ROOT): HIDAPI_ROOT = $$PWD/../../hidapi
 
 SOURCES += OpenGK850WPlugin.cpp \
-    $$HIDAPI_ROOT/windows/hid.cpp
+    $$HIDAPI_ROOT/windows/hid.c
 
 HEADERS += OpenGK850WPlugin.h
 
