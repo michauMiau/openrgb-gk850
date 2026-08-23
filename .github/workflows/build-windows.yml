@@ -36,7 +36,7 @@ jobs:
         run: |
           $env:PATH = "C:\Qt\6.4.2\mingw_64\bin;C:\Qt\Tools\mingw900_64\bin;$env:PATH"
           cd plugin
-          qmake OpenGK850WPlugin-win.pro
+          qmake OpenGK850WPlugin-win.pro "OPENRGB_ROOT=$env:GITHUB_WORKSPACE/OpenRGB" "HIDAPI_ROOT=$env:GITHUB_WORKSPACE/hidapi"
           mingw32-make -j4
 
       - name: Collect runtime DLLs
@@ -44,9 +44,12 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path pkg | Out-Null
           Copy-Item plugin/*.dll pkg/ -ErrorAction SilentlyContinue
-          Copy-Item *.dll pkg/ -ErrorAction SilentlyContinue
-          Copy-Item C:\Qt\6.4.2\mingw_64\bin\Qt6Core.dll, C:\Qt\6.4.2\mingw_64\bin\Qt6Widgets.dll, C:\Qt\6.4.2\mingw_64\bin\Qt6Gui.dll pkg/
-          Copy-Item C:\Qt\Tools\mingw900_64\bin\libgcc_s_seh-1.dll, C:\Qt\Tools\mingw900_64\bin\libstdc++-6.dll, C:\Qt\Tools\mingw900_64\bin\libwinpthread-1.dll pkg/
+          Copy-Item OpenGK850WPlugin.dll pkg/ -ErrorAction SilentlyContinue
+          Copy-Item ../OpenGK850WPlugin.dll pkg/ -ErrorAction SilentlyContinue
+          $qt = $env:QT_ROOT_DIR
+          Copy-Item "$qt\bin\Qt6Core.dll", "$qt\bin\Qt6Widgets.dll", "$qt\bin\Qt6Gui.dll" pkg/
+          $mgw = Split-Path (Get-Command g++.exe).Source
+          Copy-Item "$mgw\libgcc_s_seh-1.dll", "$mgw\libstdc++-6.dll", "$mgw\libwinpthread-1.dll" pkg/
 
       - name: Zip package
         shell: pwsh
