@@ -235,12 +235,13 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
 {
     if(!dev_handle) return;
 
-    // PCAP-verified effect sequence (every vendor effect capture):
-    //   [0] init1 + init2
-    //   [1] 06 83 b6 per-effect frame (animation data)
-    //   [2] 06 08 b8 color report (chosen RGB @ [29:31])
-    //   [3] 06 03 b6 commit ([21]=effect, [69]=packed speed|brightness)
-    SendInitCommands(true);
+    // PCAP-verified effect sequence (EVERY vendor effect capture):
+    //   [0] init1 (05 83 b6)
+    //   [1] 06 83 b6 per-effect frame
+    //   [2] init2 (05 88 b8)  <- BETWEEN frame and color, not first!
+    //   [3] 06 08 b8 color report (chosen RGB @ [29:31])
+    //   [4] 06 03 b6 commit
+    hid_send_feature_report(dev_handle, GK_INIT_1, sizeof(GK_INIT_1));
 
     /* Per-effect FRAME: the 06 83 b6 report carries per-key animation
      * seed data unique to each effect. Sending snake's frame for every
@@ -257,6 +258,8 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
         }
     }
     memcpy(frm, ftmpl, REPORT_SIZE_LED);
+    /* init2 goes AFTER the frame (vendor order), before the color report */
+    hid_send_feature_report(dev_handle, GK_INIT_2, sizeof(GK_INIT_2));
     /* The FRAME must carry the same custom-color enable flags and slider
      * values as the commit - vendor's colored sessions have them in BOTH
      * reports; a default-state frame re-arms the built-in palette and the
@@ -270,7 +273,7 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
         unsigned int lvl2 = current_brightness & 0x0F; if(lvl2 < 1) lvl2 = 1; if(lvl2 > 4) lvl2 = 4;
         unsigned int sn2 = (current_speed >> 4) & 0x0F; if(sn2 < 1) sn2 = 1; if(sn2 > 4) sn2 = 4;
         frm[69] = (unsigned char)((sn2 << 4) | lvl2);
-        static const unsigned char sscale2[5] = {0, 0x31, 0x32, 0x33, 0x34};
+        static const unsigned char sscale2[5] = {0, 0x34, 0x33, 0x32, 0x31};
         frm[39] = sscale2[lvl2];
         frm[59] = current_speed;
     }
@@ -323,7 +326,7 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
      * sweep captures use [69]=(speed_nib<<4|bright_nib). Write all. */
     {
         unsigned int lvl3 = current_brightness & 0x0F; if(lvl3 < 1) lvl3 = 1; if(lvl3 > 4) lvl3 = 4;
-        static const unsigned char sscale[5] = {0, 0x31, 0x32, 0x33, 0x34};
+        static const unsigned char sscale[5] = {0, 0x34, 0x33, 0x32, 0x31}; /* 0x31 = brightest (user-verified) */
         commit[39] = sscale[lvl3];
         commit[59] = current_speed;
     }
@@ -387,10 +390,10 @@ void OpenGK850WPlugin::SendStaticColorPacket(RGBColor color)
     unsigned char commit[REPORT_SIZE_LED];
     memcpy(commit, GK_MODE_COMMIT_ON, REPORT_SIZE_LED);
     {
-        /* invert effect-scale low nibble (1=dim..4=bright) back to the
-         * static scale where HIGHER byte = brighter per vendor captures */
+        /* Static scale is INVERTED (user + PCAP verified): 0x34 = dimmest,
+         * 0x31 = brightest. Map slider nibble (1=dim..4=bright) accordingly. */
         unsigned int lvl = current_brightness & 0x0F; if(lvl < 1) lvl = 1; if(lvl > 4) lvl = 4;
-        static const unsigned char static_scale[5] = {0, 0x31, 0x32, 0x33, 0x34};
+        static const unsigned char static_scale[5] = {0, 0x34, 0x33, 0x32, 0x31};
         commit[39] = static_scale[lvl];
     }
 
