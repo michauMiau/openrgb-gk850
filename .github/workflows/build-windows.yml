@@ -36,7 +36,7 @@ jobs:
         run: |
           $env:PATH = "C:\Qt\6.4.2\mingw_64\bin;C:\Qt\Tools\mingw900_64\bin;$env:PATH"
           cd plugin
-          qmake OpenGK850WPlugin-win.pro
+          qmake OpenGK850WPlugin-win.pro "OPENRGB_ROOT=$env:GITHUB_WORKSPACE/OpenRGB" "HIDAPI_ROOT=$env:GITHUB_WORKSPACE/hidapi"
           mingw32-make -j4
 
       - name: Collect runtime DLLs
