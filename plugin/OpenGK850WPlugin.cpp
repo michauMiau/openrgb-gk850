@@ -231,7 +231,7 @@ void OpenGK850WPlugin::SendModeCommit(CommitType type)
     }
 }
 
-void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
+void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color, bool random_color)
 {
     if(!dev_handle) return;
 
@@ -277,7 +277,18 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color)
     commit[40] = 0x07;
     commit[46] = 0x07;
     commit[58] = 0x07;
-    commit[76] = 0x00;
+    if(random_color)
+    {
+        /* Random Color (PCAP randcmp, effect 0x14): commit[76]=0x07 tells
+         * the device to cycle its own random palette. Custom-color flags
+         * stay 07 like colored sessions (vendor random frame had the same
+         * 40/46/58=07 pattern). */
+        commit[76] = 0x07;
+    }
+    else
+    {
+        commit[76] = 0x00;
+    }
     {
         unsigned int lvl3 = current_brightness & 0x0F; if(lvl3 < 1) lvl3 = 1; if(lvl3 > 4) lvl3 = 4;
         static const unsigned char sscale[5] = {0, 0x34, 0x33, 0x32, 0x31};
@@ -542,7 +553,8 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
         em.flags = 0;
         if(e.has_color)
         {
-            em.flags |= MODE_FLAG_HAS_MODE_SPECIFIC_COLOR;
+            em.flags |= MODE_FLAG_HAS_MODE_SPECIFIC_COLOR
+                      | MODE_FLAG_HAS_RANDOM_COLOR;
             em.color_mode = MODE_COLORS_MODE_SPECIFIC;
             em.colors_min = 1;
             em.colors_max = 1;
@@ -624,7 +636,14 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
                     }
                 }
             }
-            self->SendEffectPacket(mode, c);
+            bool random_color = false;
+            if(self->virtual_controller)
+            {
+                int idx = self->virtual_controller->GetActiveMode();
+                if(idx >= 0)
+                    random_color = (self->virtual_controller->GetModeColorMode((unsigned int)idx) == MODE_COLORS_RANDOM);
+            }
+            self->SendEffectPacket(mode, c, random_color);
         }
     };
 
@@ -716,6 +735,18 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
             GK_LOG_INFO("DeviceUpdateMode: effect=0x%02X color R=%d G=%d B=%d bright=0x%02X speed=0x%02X\n",
                         mode, RGBGetRValue(c), RGBGetGValue(c), RGBGetBValue(c),
                         self->current_brightness, self->current_speed);
+            /* Random Color (PCAP randcmp): when OpenRGB mode is in RANDOM
+             * color mode, set commit[76]=0x07 ("use random palette") and
+             * skip the custom-color flags. Colored sessions use [76]=00
+             * with flags 40/46/58=07. */
+            bool random_color = false;
+            if(self->virtual_controller)
+            {
+                int idx = self->virtual_controller->GetActiveMode();
+                if(idx >= 0)
+                    random_color = (self->virtual_controller->GetModeColorMode((unsigned int)idx) == MODE_COLORS_RANDOM);
+            }
+            self->SendEffectPacket(mode, c, random_color);
             self->AddDebug(QString("Effect %1 (0x%2): R=%3 G=%4 B=%5, bright=%6, speed=%7")
                 .arg(self->virtual_controller ? QString::fromStdString(
                     self->virtual_controller->GetModeName((unsigned int)
