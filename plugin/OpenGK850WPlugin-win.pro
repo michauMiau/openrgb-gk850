@@ -3,7 +3,7 @@ QT += widgets
 TARGET = OpenGK850WPlugin
 TEMPLATE = lib
 CONFIG += plugin
-DEFINES += OPENRGB_PLUGIN
+DEFINES += OPENRGB_PLUGIN QT_NO_VERSION_TAGGING
 
 # CI clones hidapi and OpenRGB into $GITHUB_WORKSPACE, i.e. siblings of
 # this repo checkout. Pass OPENRGB_ROOT / HIDAPI_ROOT via qmake args.
