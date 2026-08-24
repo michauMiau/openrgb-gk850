@@ -173,6 +173,49 @@ void OpenGK850WPlugin::SendInitCommands(bool full)
     GK_LOG_INFO("SendInitCommands: sent %s\n", full ? "init1+init2" : "init1 only");
 }
 
+/* PCAP: vendor polls GET rid6 (4 bytes, expects "44 00 00 00") after every
+ * rid5 unlock before writing big reports. Returns true when device ready. */
+bool OpenGK850WPlugin::GKPollStatus()
+{
+    if(!dev_handle) return false;
+    unsigned char st[4] = {0};
+    for(int attempt = 0; attempt < 10; attempt++)
+    {
+        int r = hid_get_feature_report(dev_handle, st, sizeof(st));
+        if(r == (int)sizeof(st) && st[0] == 0x44)
+            return true;
+        QThread::msleep(5);
+    }
+    GK_LOG_INFO("GKPollStatus: no ready ACK (last=%02x%02x%02x%02x)\n",
+                st[0], st[1], st[2], st[3]);
+    return false;
+}
+
+/* PCAP (restore_button): vendor "Zastosuj" = save-to-flash sequence:
+ * unlock3 (05 84 d4) -> status poll -> sub=4 config snapshot -> K03.
+ * The sub4 blob is a device profile we cannot safely synthesize, so this
+ * re-applies the active effect (C08+K03) after the save unlock - close
+ * approximation until a readback path is confirmed. */
+void OpenGK850WPlugin::SendSaveMode()
+{
+    if(!dev_handle) return;
+    static const unsigned char save_unlock[6] = {0x05,0x84,0xd4,0x00,0x00,0x00};
+    hid_send_feature_report(dev_handle, save_unlock, sizeof(save_unlock));
+    GKPollStatus();
+    /* Re-apply current effect so the flash write captures live state. */
+    unsigned int mode = CurrentMode();
+    if(mode >= 0x02 && mode <= 0x14 && virtual_controller)
+    {
+        int idx = virtual_controller->GetActiveMode();
+        RGBColor c = (idx >= 0) ? virtual_controller->GetModeColor((unsigned int)idx, 0)
+                                : ToRGBColor(0xFF, 0x00, 0x00);
+        bool random_color = false;
+        if(idx >= 0)
+            random_color = (virtual_controller->GetModeColorMode((unsigned int)idx) == MODE_COLORS_RANDOM);
+        SendEffectPacket((unsigned char)mode, c, random_color);
+    }
+}
+
 unsigned int OpenGK850WPlugin::CurrentMode()
 {
     // Resolve the active mode's value through the interface API (the
@@ -256,7 +299,9 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color,
      * The "06 83 b6 frame" and "06 88 xx" records in pcaps are GET_REPORT
      * readbacks (bmRequestType=A1), never written by the vendor app. */
     hid_send_feature_report(dev_handle, GK_INIT_1, sizeof(GK_INIT_1));
+    GKPollStatus();
     hid_send_feature_report(dev_handle, GK_INIT_2, sizeof(GK_INIT_2));
+    GKPollStatus();
 
     unsigned char buf[REPORT_SIZE_LED];
     memcpy(buf, GK_COLOR_DATA_ON, sizeof(GK_COLOR_DATA_ON));
@@ -772,7 +817,9 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
                 .arg(RGBGetBValue(c))
                 .arg((self->current_brightness & 0x0F))
                 .arg(((self->current_speed >> 4) & 0x07)));
-            self->SendEffectPacket(mode, c);
+            /* NOTE: single SendEffectPacket call above (with random_color).
+             * A duplicate call here used to re-send with the default
+             * random_color=false, silently disabling Random Mode. */
         }
         else
         {
