@@ -10,6 +10,7 @@
 #include <QMutex>
 #include <QMutexLocker>
 #include <QThread>
+#include <QElapsedTimer>
 #include <hidapi.h>
 
 // Number of LEDs (61 for 60% layout - GK850W is a 60% keyboard)
@@ -137,6 +138,12 @@ private:
     bool skip_init_reports = false;
     QMutex debug_mutex;
     QString pending_debug;
+
+    /* Throttle: rapid slider spam floods the device with 1032-byte SET_REPORTs
+     * and corrupts its state (user saw Bluetooth toggle!). Min gap between
+     * full effect sequences. */
+    QElapsedTimer last_effect_send;
+    QMutex send_mutex;
 
     // Brightness/speed state (commit byte[40] / byte[59]).
     unsigned char current_brightness = 0x34;   /* 0x30..0x34, 0x34 = max */
