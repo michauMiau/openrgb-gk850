@@ -235,6 +235,15 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color,
 {
     if(!dev_handle) return;
 
+    /* Throttle rapid UI spam: vendor app never sends sequences faster than
+     * ~150ms apart; faster streams corrupt the device (Bluetooth toggled!). */
+    {
+        QMutexLocker lock(&send_mutex);
+        if(last_effect_send.isValid() && last_effect_send.elapsed() < 150)
+            QThread::msleep(150 - (unsigned long)last_effect_send.elapsed());
+        last_effect_send.restart();
+    }
+
     /* DEFINITIVE protocol (USB setup-packet decode of every vendor
      * capture): an effect/color change is exactly FOUR feature writes:
      *   1. SET_REPORT ID5 "05 83 b6"        (init1)
@@ -279,20 +288,17 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color,
     unsigned char commit[REPORT_SIZE_LED];
     memcpy(commit, tmpl, REPORT_SIZE_LED);
     commit[21] = effect_id;
-    commit[40] = 0x07;
-    commit[46] = 0x07;
-    commit[58] = 0x07;
+    /* PCAP lesson (v31 regression): do NOT force flag bytes 40/46/58.
+     * Vendor colored sessions keep per-effect flag layouts (rain: 46=00,
+     * snake: 46=07, breathe pick: 40=00...) - the per-effect templates
+     * already carry the right pattern from real vendor captures. Only
+     * [21], the color slot in the C08 report, [69] and random [76] are
+     * written. */
     if(random_color)
     {
-        /* Random Color (PCAP randcmp, effect 0x14): commit[76]=0x07 tells
-         * the device to cycle its own random palette. Custom-color flags
-         * stay 07 like colored sessions (vendor random frame had the same
-         * 40/46/58=07 pattern). */
+        /* Random Color: live-pick pcaps (flashing/snake/rain) show the
+         * ONLY change on random toggle is commit[76] -> 0x07. */
         commit[76] = 0x07;
-    }
-    else
-    {
-        commit[76] = 0x00;
     }
     {
         /* PCAP-verified (speed_sweep/bright_sweep, effect 0x10):
