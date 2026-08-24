@@ -126,7 +126,7 @@ private:
     void SendStaticColorPacket(RGBColor color);
     void SendPerKeyPacket();
     void SendOffPacket(RGBColor last_color);
-    void SendEffectPacket(unsigned char effect_id, RGBColor color);
+    void SendEffectPacket(unsigned char effect_id, RGBColor color, bool random_color = false);
 
     void SetupKeyboardLayout(RGBController_Setup& setup);
 
