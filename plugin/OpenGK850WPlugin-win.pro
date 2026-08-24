@@ -3,7 +3,7 @@ QT += widgets
 TARGET = OpenGK850WPlugin
 TEMPLATE = lib
 CONFIG += plugin
-DEFINES += OPENRGB_PLUGIN HID_API_NO_STATIC_LIB
+DEFINES += OPENRGB_PLUGIN
 
 # CI clones hidapi and OpenRGB into $GITHUB_WORKSPACE, i.e. siblings of
 # this repo checkout. Pass OPENRGB_ROOT / HIDAPI_ROOT via qmake args.
@@ -23,6 +23,6 @@ INCLUDEPATH += $$OPENRGB_ROOT/RGBController
 INCLUDEPATH += $$OPENRGB_ROOT/dependencies/json
 
 LIBS += -lsetupapi -lws2_32
-QMAKE_LFLAGS += -Wl,--exclude-all-symbols
+QMAKE_LFLAGS += -Wl,--exclude-all-symbols -static-libgcc -static-libstdc++
 
 DESTDIR = ..
