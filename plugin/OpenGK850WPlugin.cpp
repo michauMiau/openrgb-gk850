@@ -11,6 +11,7 @@
 #include "gk850_reports.h"
 #include "gk850_effect_colors.h"
 #include "gk850_frames.h"
+#include "gk850_effect_flags.h"
 #include <QLabel>
 #include <QVBoxLayout>
 #include <QPushButton>
@@ -264,6 +265,17 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color,
      *   snake 0x0a -> 218, explosion 0x12 -> 386, flashing 0x14 -> 428.
      * [29:31] is a stale template field the device IGNORES for effects. */
     unsigned int coff = (unsigned int)effect_id * 21u + 8u;
+    /* Zero every effect's color slot first - our template carries baked
+     * colors of OTHER effects (from the capture it was built from) and
+     * stale slots confuse the engine. Then set only ours. */
+    for(unsigned char e = 0x02; e <= 0x14; e++)
+    {
+        unsigned int off = (unsigned int)e * 21u + 8u;
+        if(off + 2 < REPORT_SIZE_LED)
+        {
+            buf[off] = 0x00; buf[off + 1] = 0x00; buf[off + 2] = 0x00;
+        }
+    }
     if(coff + 2 < REPORT_SIZE_LED)
     {
         buf[coff]     = RGBGetRValue(color);
@@ -288,17 +300,9 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color,
     unsigned char commit[REPORT_SIZE_LED];
     memcpy(commit, tmpl, REPORT_SIZE_LED);
     commit[21] = effect_id;
-    /* PCAP lesson (v31/v32 regressions): vendor COLORED sessions use a
-     * consistent flag pattern across ALL effects:
-     *   [40]=07 [46]=07 [58]=07 (custom-color enable)
-     *   [52]=00 [54]=00         (colorless sweep templates have 07 here!)
-     * Random toggle changes ONLY [76]->07. Slider bytes [39]/[59]/[69]/[73]
-     * handled below. */
-    commit[40] = 0x07;
-    commit[46] = 0x07;
-    commit[58] = 0x07;
-    commit[52] = 0x00;
-    commit[54] = 0x00;
+    /* PCAP lesson (v31-v34 regressions): flags are PER-EFFECT, not
+     * universal. Table baked from vendor live-pick captures. */
+    GKApplyEffectFlags(commit, effect_id);
     if(random_color)
     {
         /* Random Color: live-pick pcaps (flashing/snake/rain) show the
