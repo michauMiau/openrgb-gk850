@@ -250,15 +250,20 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color,
 
     unsigned char buf[REPORT_SIZE_LED];
     memcpy(buf, GK_COLOR_DATA_ON, sizeof(GK_COLOR_DATA_ON));
-    /* PCAP PROVEN (carousel→explosion green/red/blue capture): the effect
-     * engine reads the color from bytes [386],[387],[388] = R,G,B.
+    /* PCAP PROVEN (live-pick captures for snake/explosion/flashing):
+     * each effect reads its color from C08[eid*21 + 8 .. +10] = R,G,B.
+     *   snake 0x0a -> 218, explosion 0x12 -> 386, flashing 0x14 -> 428.
      * [29:31] is a stale template field the device IGNORES for effects. */
+    unsigned int coff = (unsigned int)effect_id * 21u + 8u;
+    if(coff + 2 < REPORT_SIZE_LED)
+    {
+        buf[coff]     = RGBGetRValue(color);
+        buf[coff + 1] = RGBGetGValue(color);
+        buf[coff + 2] = RGBGetBValue(color);
+    }
     buf[29] = RGBGetRValue(color);
     buf[30] = RGBGetGValue(color);
     buf[31] = RGBGetBValue(color);
-    buf[386] = RGBGetRValue(color);
-    buf[387] = RGBGetGValue(color);
-    buf[388] = RGBGetBValue(color);
     int r1 = hid_send_feature_report(dev_handle, buf, REPORT_SIZE_LED);
     GK_LOG_INFO("SendEffectPacket(%02X): color report ret=%d\n", effect_id, r1);
     AddDebug(QString("Eff %1: color ret=%2").arg(effect_id, 2, 16).arg(r1));
