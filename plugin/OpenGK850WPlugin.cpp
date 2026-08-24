@@ -290,10 +290,12 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color,
         commit[76] = 0x00;
     }
     {
+        /* PCAP-verified (speed_sweep/bright_sweep, effect 0x10):
+         * commit[69] = (SPEED << 4) | BRIGHTNESS, both nibbles 1..4,
+         * 4 = fastest / brightest. Vendor: speed 34,24,14 (fast→slow),
+         * bright 43,42,41 (max→min). [59]/[39] are template junk for
+         * effects and are left untouched. */
         unsigned int lvl3 = current_brightness & 0x0F; if(lvl3 < 1) lvl3 = 1; if(lvl3 > 4) lvl3 = 4;
-        static const unsigned char sscale[5] = {0, 0x34, 0x33, 0x32, 0x31};
-        commit[39] = sscale[lvl3];
-        commit[59] = current_speed;
         unsigned int sn3 = (current_speed >> 4) & 0x0F; if(sn3 < 1) sn3 = 1; if(sn3 > 4) sn3 = 4;
         commit[69] = (unsigned char)((sn3 << 4) | lvl3);
     }
@@ -671,15 +673,14 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
             if(idx >= 0) {
                 unsigned int b = self->virtual_controller->GetModeBrightness((unsigned int)idx);
                 unsigned int s = self->virtual_controller->GetModeSpeed((unsigned int)idx);
-                // NEW PCAPs (effect brightness/speed sweeps, effect 0x10):
-                // for EFFECTS both params live in commit byte [69]:
-                //   brightness: 0x43=highest, 0x42, 0x41=lowest (4 lvls)
-                //   speed:      0x34, 0x24, 0x14 (slowest) - 0x44 fastest
-                static const unsigned char bright_table[5] = {0x44, 0x44, 0x43, 0x42, 0x41};
+                // PCAP-verified (speed_sweep/bright_sweep): commit[69] =
+                //   (SPEED << 4) | BRIGHTNESS, nibbles 1..4, 4=fast/max.
+                // OpenRGB sliders: b in 0..4 (4=brightest), s in 0..3
+                // (3=fastest). Map directly to vendor nibbles:
+                //   brightness: b0->1 ... b4->4
+                //   speed:      s0(0x14)->1 ... s3(0x44)->4
                 if(b > 4) b = 4;
-                self->current_brightness = bright_table[b];
-                // Speed 0..3 -> commit byte[59] 0x14/0x24/0x34/0x44
-                // (PCAP-verified: neon slowest=0x14, fastest=0x44)
+                self->current_brightness = (unsigned char)(0x40 | (b + 1));
                 static const unsigned char speed_table[4] = {0x14, 0x24, 0x34, 0x44};
                 if(s > 3) s = 3;
                 self->current_speed = speed_table[s];
