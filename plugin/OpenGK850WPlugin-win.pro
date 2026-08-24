@@ -23,5 +23,6 @@ INCLUDEPATH += $$OPENRGB_ROOT/RGBController
 INCLUDEPATH += $$OPENRGB_ROOT/dependencies/json
 
 LIBS += -lsetupapi -lws2_32
+QMAKE_LFLAGS += -Wl,--exclude-all-symbols
 
 DESTDIR = ..
