@@ -123,6 +123,10 @@ private:
     //   perkey: init1         -> bc-data + c0-data         -> commit_game
     enum CommitType { COMMIT_ON, COMMIT_OFF, COMMIT_GAME };
     void SendInitCommands(bool full);
+    /* PCAP: vendor polls GET rid6 (4 bytes, expects "44 00 00 00") after
+     * every rid5 unlock before writing big reports. */
+    bool GKPollStatus();
+    void SendSaveMode();
     void SendModeCommit(CommitType type);
     void SendStaticColorPacket(RGBColor color);
     void SendPerKeyPacket();
