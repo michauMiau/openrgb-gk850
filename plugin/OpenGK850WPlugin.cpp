@@ -288,12 +288,17 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color,
     unsigned char commit[REPORT_SIZE_LED];
     memcpy(commit, tmpl, REPORT_SIZE_LED);
     commit[21] = effect_id;
-    /* PCAP lesson (v31 regression): do NOT force flag bytes 40/46/58.
-     * Vendor colored sessions keep per-effect flag layouts (rain: 46=00,
-     * snake: 46=07, breathe pick: 40=00...) - the per-effect templates
-     * already carry the right pattern from real vendor captures. Only
-     * [21], the color slot in the C08 report, [69] and random [76] are
-     * written. */
+    /* PCAP lesson (v31/v32 regressions): vendor COLORED sessions use a
+     * consistent flag pattern across ALL effects:
+     *   [40]=07 [46]=07 [58]=07 (custom-color enable)
+     *   [52]=00 [54]=00         (colorless sweep templates have 07 here!)
+     * Random toggle changes ONLY [76]->07. Slider bytes [39]/[59]/[69]/[73]
+     * handled below. */
+    commit[40] = 0x07;
+    commit[46] = 0x07;
+    commit[58] = 0x07;
+    commit[52] = 0x00;
+    commit[54] = 0x00;
     if(random_color)
     {
         /* Random Color: live-pick pcaps (flashing/snake/rain) show the
