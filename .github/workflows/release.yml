@@ -1,0 +1,103 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt 6.4.2 (linux gcc)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.4.2'
+          host: 'linux'
+          target: 'desktop'
+          arch: 'gcc_64'
+      - name: Install hidapi
+        run: sudo apt-get update && sudo apt-get install -y libhidapi-dev
+      - name: Fetch OpenRGB headers
+        run: |
+          git clone --depth 1 https://gitlab.com/CalcProgrammer1/OpenRGB.git "$GITHUB_WORKSPACE/OpenRGB" || \
+          git clone --depth 1 https://github.com/CalcProgrammer1/OpenRGB.git "$GITHUB_WORKSPACE/OpenRGB"
+      - name: Build
+        shell: bash
+        run: |
+          cd plugin
+          sed -i 's|INCLUDEPATH += /home/truenas_admin/OpenRGB|INCLUDEPATH += '"$GITHUB_WORKSPACE"'/OpenRGB|; s|INCLUDEPATH += /home/truenas_admin/OpenRGB/RGBController|INCLUDEPATH += '"$GITHUB_WORKSPACE"'/OpenRGB/RGBController|; s|INCLUDEPATH += /home/truenas_admin/OpenRGB/dependencies/json|INCLUDEPATH += '"$GITHUB_WORKSPACE"'/OpenRGB/dependencies/json|' OpenGK850WPlugin.pro
+          qmake OpenGK850WPlugin.pro
+          make -j4
+      - name: Package
+        run: |
+          mkdir -p pkg
+          cp libOpenGK850WPlugin.so pkg/
+          cd pkg && zip ../OpenGK850WPlugin-linux64.zip *
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-build
+          path: OpenGK850WPlugin-linux64.zip
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt 6.4.2 (mingw)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.4.2'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_mingw'
+          cache: true
+      - name: Fetch hidapi
+        shell: bash
+        run: git clone --depth 1 --branch hidapi-0.13.1 https://github.com/libusb/hidapi.git "$GITHUB_WORKSPACE/hidapi"
+      - name: Fetch OpenRGB headers
+        shell: bash
+        run: |
+          git clone --depth 1 https://gitlab.com/CalcProgrammer1/OpenRGB.git "$GITHUB_WORKSPACE/OpenRGB" || \
+          git clone --depth 1 https://github.com/CalcProgrammer1/OpenRGB.git "$GITHUB_WORKSPACE/OpenRGB"
+      - name: Build DLL
+        shell: pwsh
+        run: |
+          $env:PATH = "C:\Qt\6.4.2\mingw_64\bin;C:\Qt\Tools\mingw900_64\bin;$env:PATH"
+          cd plugin
+          qmake OpenGK850WPlugin-win.pro "OPENRGB_ROOT=$env:GITHUB_WORKSPACE/OpenRGB" "HIDAPI_ROOT=$env:GITHUB_WORKSPACE/hidapi"
+          mingw32-make -j4
+      - name: Collect runtime DLLs
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path pkg | Out-Null
+          Copy-Item plugin/*.dll pkg/ -ErrorAction SilentlyContinue
+          Copy-Item OpenGK850WPlugin.dll pkg/ -ErrorAction SilentlyContinue
+          Copy-Item ../OpenGK850WPlugin.dll pkg/ -ErrorAction SilentlyContinue
+          $qt = $env:QT_ROOT_DIR
+          Copy-Item "$qt\bin\Qt6Core.dll", "$qt\bin\Qt6Widgets.dll", "$qt\bin\Qt6Gui.dll" pkg/
+          $mgw = Split-Path (Get-Command g++.exe).Source
+          Copy-Item "$mgw\libgcc_s_seh-1.dll", "$mgw\libstdc++-6.dll", "$mgw\libwinpthread-1.dll" pkg/
+      - name: Zip package
+        shell: pwsh
+        run: Compress-Archive -Path pkg/* -DestinationPath OpenGK850WPlugin-win64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: OpenGK850WPlugin-win64.zip
+
+  release:
+    needs: [build-linux, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            artifacts/linux-build/*
+            artifacts/windows-build/*
