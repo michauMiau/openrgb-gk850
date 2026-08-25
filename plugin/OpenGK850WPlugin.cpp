@@ -356,6 +356,13 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color,
          * IMPORTANT: the other flag bytes keep their CUSTOM values! */
         commit[GKRandomSelectorPos(effect_id)] = 0x07;
     }
+    else
+    {
+        /* CRITICAL: all sweep templates have selector bytes =07 baked in
+         * (captured with random engaged) which forced effects like
+         * flashing/snake/stars into permanent random. Explicit 00. */
+        commit[GKRandomSelectorPos(effect_id)] = 0x00;
+    }
     {
         /* PCAP-verified (speed_sweep/bright_sweep, effect 0x10):
          * commit[69] = (SPEED << 4) | BRIGHTNESS, both nibbles 1..4,
