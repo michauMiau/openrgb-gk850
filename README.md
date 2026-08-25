@@ -1,120 +1,89 @@
-# OpenRGB GK850W Controller + Virtual Plugin
+# OpenRGB GK850W Plugin
 
-## Overview
+OpenRGB plugin for the **BY Tech / Mad Dog GK850(W)** keyboard — full control over all 19 hardware effects, custom colors, and per-key painting. No patching of the OpenRGB source required; it ships as a standalone plugin using the Virtual Controller API.
 
-This repository contains a complete solution for supporting the BY Tech / Mad Dog GK850(W) keyboard in OpenRGB:
+## Features
 
-1. **GK850W Keyboard Controller** — New Sinowealth-based controller with product-string verification to distinguish from FL eSports F11
-2. **Virtual Controller Plugin** — Standalone OpenRGB plugin using Virtual Controller API (no main repo patching required)
+- ✅ **All 19 hardware effects** with working custom color selection
+- 🎲 **Random Color mode** on every effect that supports it (per-effect selector byte, reverse-engineered from USB captures: `selector = 36 + 2×effect_id`)
+- 💡 Brightness and speed control (mapped to vendor nibbles)
+- 🎨 **Custom / per-key mode** for painting patterns and artwork across the 61-key layout
+- 🔌 Plug-and-play: auto-detection via VID/PID + product string verification
+- 🏷️ Manual save button persists current state to keyboard flash
 
-## VID/PID
+### Known limitation
+
+Per-key updates briefly flash black — this is a firmware behavior of the Sinowealth BY916 chip, not a plugin bug (the vendor application flickers identically). There is no realtime/direct mode in this protocol generation; effects run at hardware speed instead.
+
+## Device Identification
 
 - **VID:PID**: `258a:0049` (Sinowealth BY916 chip)
-- **Product string**: "GK850" (distinguishes from FL eSports F11 which shares the same PID)
-- **Protocol**: Report ID 5/6 (same as existing Sinowealth keyboards)
+- **Product string**: `GK850` — distinguishes it from the FL eSports F11, which shares the same PID
 
-## Brick Risk Warning
+> ⚠️ **Brick risk note:** PID `0x0049` is shared with FL eSports F11 and some Redragon devices. The upstream OpenRGB detection was disabled over this. This plugin only talks to keyboards whose product string is `GK850`, and ships as a standalone plugin — nothing in the main OpenRGB repo is patched.
 
-PID `0x0049` is shared with FL eSports F11 and Redragon devices. The original OpenRGB code disabled detection due to brick risk on Redragon hardware. Our solution:
+## Installation
 
-- Uses **product string "GK850"** as a safe distinguisher
-- Virtual Controller plugin approach requires **no patching** of main repo, eliminating brick risk entirely
+### Linux
 
-## Files
+1. Install the udev rule so OpenRGB can talk to the keyboard without root:
 
-### Controller (Unmaintained)
+```bash
+sudo tee /etc/udev/rules.d/99-gk850w-plugin.rules << 'EOF'
+SUBSYSTEMS=="usb|hidraw", ATTRS{idVendor}=="258a", ATTRS{idProduct}=="0049", TAG+="uaccess"
+EOF
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
 
-Located in `Controllers/SinowealthController/SinowealthGK850WController/`:
+(or just run `./udev-setup.sh`, which does the same)
 
-- `SinowealthGK850WController.h/cpp` — Core controller implementation
-- `RGBController_SinowealthGK850W.h/cpp` — OpenRGB RGBController wrapper
+2. Download `OpenGK850WPlugin-linux64.zip` from the [latest release](https://github.com/michauMiau/openrgb-gk850/releases/latest) and copy `libOpenGK850WPlugin.so` into your OpenRGB plugins directory (`~/.config/OpenRGB/plugins/`).
 
-### Plugin (standalone, no patching required)
+### Windows
 
-Located in `plugin/`:
+Download `OpenGK850WPlugin-win64.zip` from the [latest release](https://github.com/michauMiau/openrgb-gk850/releases/latest). Copy `OpenGK850WPlugin.dll` into `%APPDATA%\OpenRGB\plugins\`. The MinGW/Qt runtime DLLs go next to `OpenRGB.exe` if your build doesn't bundle them.
 
-- `OpenGK850WPlugin.h/cpp/.pro` — Source files
-- `OpenGK850WPlugin.json` — Qt plugin metadata
-- `README.md` — This file
-
-## PCAP Analysis Reference
-
-Protocol analysis from USB HID captures (`hid-pcap-analysis.md`):
-
-### Report ID 5 (Command Packets) — 6 bytes
-
-Format: `{0x05, mode, speed, brightness, 0x00, 0x00}`
-
-| Mode | Value | Description |
-| ------ | ------- | ------------- |
-| Static | 0x01 | Single color static |
-| Breathing | 0x02 | Breath effect |
-| Rainbow/Transition | 0x03 | Rainbow transition |
-| Flash Away | 0x04 | Flash outward |
-| Raindrops | 0x05 | Raindrop pattern |
-| Off | 0x16 | All LEDs off |
-| Custom (per-key) | 0x15 | Addressable per-key mode |
-
-Speed values: `SLOW=0x12`, `NORMAL=0x22`, `FASTER=0x32`, `FASTEST=0x42`
-Brightness values: `OFF=0x00`, `QUARTER=0x01`, `HALF=0x02`, `THREE_QUARTERS=0x03`, `FULL=0x04`
-
-### Report ID 6 (LED Data) — 1032 bytes
-
-Header: `{0x06, 0x08, 0xB8, 0x00, 0x40, ...}`
-
-- Per-key data at specific offsets (see `tkl_keys_per_key_index` in existing controller)
-- **BGR byte order** (not RGB!) — blue, green, red channels
-
-## Building the Plugin
+## Building From Source
 
 ### Prerequisites
 
 - Qt 6.4+ development tools (`qtbase6-dev-tools`, `qmake6`)
-- hidapi library (`libhidapi-hidraw0-dev`)
-- OpenRGB source headers (clone from gitlab.com/OpenRGBDevelopers/OpenRGB)
-
-### Build Steps
+- hidapi (`libhidapi-hidraw0-dev`)
+- OpenRGB source headers
 
 ```bash
-# Clone OpenRGB for headers
 git clone https://gitlab.com/OpenRGBDevelopers/OpenRGB.git ~/OpenRGB
-
-# Configure and build plugin
 cd plugin/
 qmake6 OpenGK850WPlugin.pro
 make -j$(nproc)
-
-# Install to OpenRGB plugins directory
 cp libOpenGK850WPlugin.so ~/.config/OpenRGB/plugins/
 ```
 
-### For AppImage Users (Qt 6.4.2)
-
-The official OpenRGB pipeline AppImage bundles Qt 6.4.2. To avoid version mismatch:
-
-```bash
-# Extract AppImage Qt libs (if needed)
-unsquashfs -d /tmp/appimg_extract OpenRGB-x86_64.AppImage
-
-# Set RPATH to AppImage Qt directory
-patchelf --set-rpath '/tmp/appimg_extract/usr/lib:$ORIGIN' libOpenGK850WPlugin.so
-```
+CI builds on every version tag (`v*`) for both Linux and Windows via GitHub Actions.
 
 ## Usage
 
-1. Install Plugin using OpenRGB
-2. Plugin will auto-detect GK850W keyboard via VID:PID + product string verification
-3. Virtual controller appears in device list as normal
+1. Start OpenRGB with the plugin installed — the keyboard appears as a normal device.
+2. Pick one of the 19 hardware effects and set its color; toggle Random Colors for palette cycling.
+3. Use **Custom** mode for per-key painting (patterns, artwork, indicators).
+4. The debug log widget shows the last HID traffic for troubleshooting.
 
-## Compatibility Notes
+### Compatibility notes
 
-- ✅ OpenRGB Effects Plugin not compatible (Keyboard doesn't have a "Direct" mode, using effects may wear out the flash, or reset)
 - ✅ No main repo patching required
-- ✅ Only detects the right keyboard (product string check prevents sending data to other keyboards)
-- ⚠️ Requires udev rules on Linux (script to install udev-setup.sh in repo)
+- ✅ Only detects the correct keyboard (product string check prevents sending data to other devices)
+- ⚠️ Effects Plugin works through hardware effect emulation; rapid software-driven animation is limited by the firmware (~4 fps, see limitation above)
+
+## Protocol Reference
+
+Reverse-engineered from USB HID captures of the vendor software (see `hid-pcap-analysis.md`):
+
+- **Report ID 5** (6 B): unlock/init commands (`05 83 b6`, `05 88 b8`, save unlock `05 84 d4`)
+- **Report ID 6** (1032 B): LED data — sub-reports `06 08 b8` (effect color), `06 09 bc/c0` (per-key), commit `06 03 b6`
+- Effect color lives at `C08[eid×21+8..10]` (R,G,B); commit carries effect ID at `[21]`, `(speed<<4)|brightness` at `[69]`, and per-effect flag/selector bytes
 
 ## Author
 
 garfi-kod, michaumiau 2026
-Based on PCAP analysis of the original software.
+Based on PCAP analysis of the original vendor software.
 GPL-2 License (same as upstream)
