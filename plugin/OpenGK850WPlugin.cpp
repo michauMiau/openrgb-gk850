@@ -179,16 +179,19 @@ void OpenGK850WPlugin::SendInitCommands(bool full)
 bool OpenGK850WPlugin::GKPollStatus()
 {
     if(!dev_handle) return false;
-    unsigned char st[4] = {0};
+    /* Vendor GET_REPORT used report ID 6 and received "44 00 00 00".
+     * hidapi requires the report id in st[0] before the call; the
+     * returned buffer starts with that id byte. */
+    unsigned char st[5] = {0x06};
     for(int attempt = 0; attempt < 10; attempt++)
     {
         int r = hid_get_feature_report(dev_handle, st, sizeof(st));
-        if(r == (int)sizeof(st) && st[0] == 0x44)
+        if(r >= (int)sizeof(st) - 1 && st[0] == 0x06 && st[1] == 0x44)
             return true;
         QThread::msleep(5);
     }
-    GK_LOG_INFO("GKPollStatus: no ready ACK (last=%02x%02x%02x%02x)\n",
-                st[0], st[1], st[2], st[3]);
+    GK_LOG_INFO("GKPollStatus: no ready ACK (last=%02x%02x%02x%02x%02x)\n",
+                st[0], st[1], st[2], st[3], st[4]);
     return false;
 }
 
@@ -801,7 +804,7 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
             }
             GK_LOG_INFO("DeviceUpdateMode: effect=0x%02X color R=%d G=%d B=%d bright=0x%02X speed=0x%02X\n",
                         mode, RGBGetRValue(c), RGBGetGValue(c), RGBGetBValue(c),
-                        self->current_brightness, self->current_speed);
+                        self->current_brightness.load(), self->current_speed.load());
             /* Random Color (PCAP randcmp): when OpenRGB mode is in RANDOM
              * color mode, set commit[76]=0x07 ("use random palette") and
              * skip the custom-color flags. Colored sessions use [76]=00

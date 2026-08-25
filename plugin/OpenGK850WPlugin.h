@@ -11,6 +11,7 @@
 #include <QMutexLocker>
 #include <QThread>
 #include <QElapsedTimer>
+#include <atomic>
 #include <hidapi.h>
 
 // Number of LEDs (61 for 60% layout - GK850W is a 60% keyboard)
@@ -150,8 +151,10 @@ private:
     QMutex send_mutex;
 
     // Brightness/speed state (commit byte[40] / byte[59]).
-    unsigned char current_brightness = 0x34;   /* 0x30..0x34, 0x34 = max */
-    unsigned char current_speed      = 0x24;   /* 0x14/0x24/0x34 */
+    /* Written from UI callbacks, read from send paths - atomic to avoid
+     * torn reads across threads (Copilot review finding). */
+    std::atomic<unsigned char> current_brightness{0x34};   /* 0x30..0x34, 0x34 = max */
+    std::atomic<unsigned char> current_speed{0x24};        /* 0x14/0x24/0x34 */
 
     // Returns the currently active OpenRGB mode reading the controller
     unsigned int CurrentMode();
