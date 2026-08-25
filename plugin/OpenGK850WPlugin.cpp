@@ -231,6 +231,7 @@ unsigned int OpenGK850WPlugin::CurrentMode()
 
         // Match by mode name - stable regardless of list order.
         if(name == "Custom")        return MODE_PER_KEY;
+        if(name == "Direct")        return MODE_PER_KEY;
         if(name == "Static")        return MODE_STATIC;
         if(name == "Off")           return MODE_OFF;
 
@@ -586,6 +587,16 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
     m.brightness = 4;
     setup.modes.push_back(m);
 
+    // Direct: same per-key packet path but flagged as OpenRGB Direct mode
+    // so the effects engine streams at full speed (no per-key commit,
+    // no throttle - SendPerKeyPacket already skips init/commit when
+    // streaming). Flicker-free since v1.1.x streaming path.
+    m.name = "Direct";
+    m.value = MODE_PER_KEY;
+    m.flags = MODE_FLAG_HAS_PER_LED_COLOR | MODE_FLAG_MANUAL_SAVE;
+    m.color_mode = MODE_COLORS_PER_LED;
+    setup.modes.push_back(m);
+
     // Static: whole device set to one static color (may flicker/save).
     m.name = "Static";
     m.value = MODE_STATIC;
@@ -731,6 +742,14 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
         {
             self->SendPerKeyPacket();
         }
+    };
+
+    /* Manual save (Direct mode has MODE_FLAG_MANUAL_SAVE): persist the
+     * current state to the keyboard's flash via vendor save sequence. */
+    setup.DeviceSaveMode = [](void* arg) {
+        auto* self = (OpenGK850WPlugin*)arg;
+        if(!self->dev_handle) return;
+        self->SendSaveMode();
     };
 
     setup.DeviceUpdateMode = [](void* arg) {
