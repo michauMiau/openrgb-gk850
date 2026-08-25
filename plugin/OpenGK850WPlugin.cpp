@@ -499,15 +499,11 @@ void OpenGK850WPlugin::SendPerKeyPacket()
         }
     }
 
-    /* Commit FIRST on mode entry: the commit restarts the lighting
-     * engine (black), so colors must land AFTER it or the keyboard
-     * flashes black on every Direct entry / color pick. */
-    if(perkey_needs_commit && !skip_init_reports)
-    {
-        SendModeCommit(COMMIT_GAME);
-        perkey_needs_commit = false;
-    }
-
+    /* Vendor order (game_mode pcap): init1 -> bc -> c0 -> COMMIT.
+     * The commit APPLIES the buffered colors - it must come AFTER them,
+     * otherwise the entry commit applies an empty template (black).
+     * Extra color resend after the commit: the commit may restart the
+     * lighting engine, so re-send once more to guarantee visible state. */
     int ret = hid_send_feature_report(dev_handle, buf, REPORT_SIZE_LED);
     if(ret < 0)
     {
@@ -519,6 +515,15 @@ void OpenGK850WPlugin::SendPerKeyPacket()
     if(ret < 0)
     {
         GK_LOG_INFO("SendPerKeyPacket[2]: hid_send_feature_report failed (ret=%d)\n", ret);
+    }
+
+    if(perkey_needs_commit && !skip_init_reports)
+    {
+        SendModeCommit(COMMIT_GAME);
+        perkey_needs_commit = false;
+        /* Re-apply colors in case the commit restarted the engine. */
+        hid_send_feature_report(dev_handle, buf, REPORT_SIZE_LED);
+        hid_send_feature_report(dev_handle, buf2, REPORT_SIZE_LED);
     }
 }
 
