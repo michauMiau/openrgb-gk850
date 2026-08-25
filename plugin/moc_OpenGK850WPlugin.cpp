@@ -145,7 +145,7 @@ static constexpr unsigned char qt_pluginMetaDataV2_OpenGK850WPlugin[] = {
     'o',  'p',  'e',  'n',  'r',  'g',  'b',  '-', 
     'g',  'k',  '8',  '5',  '0',  0x6a,  'V',  'e', 
     'r',  's',  'i',  'o',  'n',  'S',  't',  'r', 
-    0x63,  '3',  '.',  '0', 
+    0x63,  '4',  '.',  '0', 
     0xff, 
 };
 QT_MOC_EXPORT_PLUGIN_V2(OpenGK850WPlugin, OpenGK850WPlugin, qt_pluginMetaDataV2_OpenGK850WPlugin)
@@ -196,7 +196,7 @@ Q_CONSTINIT static constexpr unsigned char qt_pluginMetaData_OpenGK850WPlugin[] 
     'o',  'p',  'e',  'n',  'r',  'g',  'b',  '-', 
     'g',  'k',  '8',  '5',  '0',  0x6a,  'V',  'e', 
     'r',  's',  'i',  'o',  'n',  'S',  't',  'r', 
-    0x63,  '3',  '.',  '0', 
+    0x63,  '4',  '.',  '0', 
     0xff, 
 };
 QT_MOC_EXPORT_PLUGIN(OpenGK850WPlugin, OpenGK850WPlugin)

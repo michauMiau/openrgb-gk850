@@ -12,6 +12,7 @@
 #include "gk850_effect_colors.h"
 #include "gk850_frames.h"
 #include "gk850_effect_flags.h"
+#include "gk850_random_selectors.h"
 #include <QLabel>
 #include <QVBoxLayout>
 #include <QPushButton>
@@ -345,14 +346,15 @@ void OpenGK850WPlugin::SendEffectPacket(unsigned char effect_id, RGBColor color,
     unsigned char commit[REPORT_SIZE_LED];
     memcpy(commit, tmpl, REPORT_SIZE_LED);
     commit[21] = effect_id;
-    /* PCAP lesson (v31-v34 regressions): flags are PER-EFFECT, not
-     * universal. Table baked from vendor live-pick captures. */
+    /* PCAP lesson (v31-v36): flags are PER-EFFECT. Table baked from
+     * vendor live-pick captures. */
     GKApplyEffectFlags(commit, effect_id);
     if(random_color)
     {
-        /* Random Color: live-pick pcaps (flashing/snake/rain) show the
-         * ONLY change on random toggle is commit[76] -> 0x07. */
-        commit[76] = 0x07;
+        /* Random Color: each effect flips ONE selector byte 00->07
+         * (flashing[76], snake[56], stars[52], breathing[40] - proven).
+         * IMPORTANT: the other flag bytes keep their CUSTOM values! */
+        commit[GKRandomSelectorPos(effect_id)] = 0x07;
     }
     {
         /* PCAP-verified (speed_sweep/bright_sweep, effect 0x10):
@@ -703,14 +705,12 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
                      * treated as the untouched default and swapped out). */
                 }
             }
-            bool random_color = false;
-            if(self->virtual_controller)
-            {
-                int idx = self->virtual_controller->GetActiveMode();
-                if(idx >= 0)
-                    random_color = (self->virtual_controller->GetModeColorMode((unsigned int)idx) == MODE_COLORS_RANDOM);
-            }
-            self->SendEffectPacket(mode, c, random_color);
+            /* UpdateLEDs = user picked a color. ALWAYS send custom -
+             * a color pick overrides Random until it's re-toggled in the
+             * mode tab (DeviceUpdateMode fires on that toggle and
+             * re-engages random). Trusting ColorMode here made effects
+             * stuck on random even after picking a color. */
+            self->SendEffectPacket(mode, c, false);
         }
     };
 
