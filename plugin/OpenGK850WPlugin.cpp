@@ -453,6 +453,12 @@ void OpenGK850WPlugin::SendPerKeyPacket()
 {
     if(!dev_handle) return;
 
+    /* Serialize ALL per-key writes: UpdateMode/UpdateLEDs/SingleLED can
+     * fire from different threads; interleaved init/commit/color writes
+     * from two threads corrupt the stream (black keyboard on fast
+     * clicking). */
+    QMutexLocker lock(&send_mutex);
+
     // PCAP-verified per-key sequence (game_mode_adressable_.pcapng):
     //   [0] 05 83 b6 00 00 00   (init1 only - NO init2 for game mode)
     //   [1] 06 09 bc ...        (key color data, RGB blocks 126B apart)
