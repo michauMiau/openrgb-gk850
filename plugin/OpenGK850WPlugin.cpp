@@ -459,6 +459,15 @@ void OpenGK850WPlugin::SendPerKeyPacket()
      * clicking). */
     QMutexLocker lock(&send_mutex);
 
+    /* Firmware can't absorb back-to-back 1032B control writes: frames
+     * get dropped/corrupted (glitches, black flashes). Coalesce to a
+     * min interval - latest state wins, intermediate frames skipped. */
+    if(last_perkey_send.isValid() && last_perkey_send.elapsed() < 12)
+    {
+        QThread::msleep(12 - (unsigned long)last_perkey_send.elapsed());
+    }
+    last_perkey_send.restart();
+
     // PCAP-verified per-key sequence (game_mode_adressable_.pcapng):
     //   [0] 05 83 b6 00 00 00   (init1 only - NO init2 for game mode)
     //   [1] 06 09 bc ...        (key color data, RGB blocks 126B apart)

@@ -80,6 +80,7 @@ private:
     std::vector<RGBColor> leds;
     unsigned int current_mode = MODE_OFF;
     unsigned int last_committed_mode = 0xFFFFFFFF; /* mode actually init'ed on device */
+    QElapsedTimer last_perkey_send; /* per-key stream coalescing */
     RGBControllerInterface* virtual_controller = nullptr;
     QString debug_log = "no reports sent yet";
     QPlainTextEdit* widget_debug_log = nullptr;  // Reference to UI debug log
