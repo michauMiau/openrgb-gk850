@@ -473,6 +473,7 @@ void OpenGK850WPlugin::SendPerKeyPacket()
         }
         perkey_inited = true;
         perkey_needs_commit = true;
+        last_committed_mode = current_mode;
     }
 
     unsigned char buf[REPORT_SIZE_LED];
@@ -757,9 +758,15 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
         if(!self->dev_handle) return;
 
         self->SyncModeFromController();
-        // Mode change: force fresh init + commit for the new mode.
-        self->perkey_inited = false;
-        unsigned int mode = self->CurrentMode();
+        /* Only force fresh init+commit when the mode ACTUALLY changed.
+         * OpenRGB's effects plugin calls UpdateMode on every frame in
+         * some paths; re-initializing each time restarts the lighting
+         * engine -> black flicker + ~4fps. */
+        if(self->current_mode != self->last_committed_mode)
+        {
+            self->perkey_inited = false;
+        }
+        unsigned int mode = self->current_mode;
 
         // Read brightness/speed set by the OpenRGB UI (slider values).
         if(self->virtual_controller) {
