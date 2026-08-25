@@ -499,6 +499,15 @@ void OpenGK850WPlugin::SendPerKeyPacket()
         }
     }
 
+    /* Commit FIRST on mode entry: the commit restarts the lighting
+     * engine (black), so colors must land AFTER it or the keyboard
+     * flashes black on every Direct entry / color pick. */
+    if(perkey_needs_commit && !skip_init_reports)
+    {
+        SendModeCommit(COMMIT_GAME);
+        perkey_needs_commit = false;
+    }
+
     int ret = hid_send_feature_report(dev_handle, buf, REPORT_SIZE_LED);
     if(ret < 0)
     {
@@ -510,14 +519,6 @@ void OpenGK850WPlugin::SendPerKeyPacket()
     if(ret < 0)
     {
         GK_LOG_INFO("SendPerKeyPacket[2]: hid_send_feature_report failed (ret=%d)\n", ret);
-    }
-
-    // Commit only on mode entry; streaming updates skip it so the keyboard
-    // doesn't blink black on every frame.
-    if(perkey_needs_commit && !skip_init_reports)
-    {
-        SendModeCommit(COMMIT_GAME);
-        perkey_needs_commit = false;
     }
 }
 
