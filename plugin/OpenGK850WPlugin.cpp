@@ -1003,7 +1003,7 @@ OpenRGBPluginInfo OpenGK850WPlugin::GetPluginInfo()
     OpenRGBPluginInfo info;
     info.Name = "GK850W";
     info.Description = "Plugin implementing support for the GK850W keyboard";
-    info.Version = "4.0.0";
+    info.Version = "4.0";
     info.Commit = "local-build";
     info.URL = "https://github.com/michauMiau/openrgb-gk850";
     info.Location = OPENRGB_PLUGIN_LOCATION_TOP;

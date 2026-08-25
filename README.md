@@ -1,7 +1,5 @@
 # OpenRGB GK850W Controller + Virtual Plugin
 
-GPL-2 License (same as upstream)
-
 ## Overview
 
 This repository contains a complete solution for supporting the BY Tech / Mad Dog GK850(W) keyboard in OpenRGB:
@@ -24,15 +22,17 @@ PID `0x0049` is shared with FL eSports F11 and Redragon devices. The original Op
 
 ## Files
 
-### Controller (for direct integration into OpenRGB)
+### Controller (Unmaintained)
 
 Located in `Controllers/SinowealthController/SinowealthGK850WController/`:
+
 - `SinowealthGK850WController.h/cpp` — Core controller implementation
 - `RGBController_SinowealthGK850W.h/cpp` — OpenRGB RGBController wrapper
 
 ### Plugin (standalone, no patching required)
 
 Located in `plugin/`:
+
 - `OpenGK850WPlugin.h/cpp/.pro` — Source files
 - `OpenGK850WPlugin.json` — Qt plugin metadata
 - `README.md` — This file
@@ -42,10 +42,11 @@ Located in `plugin/`:
 Protocol analysis from USB HID captures (`hid-pcap-analysis.md`):
 
 ### Report ID 5 (Command Packets) — 6 bytes
+
 Format: `{0x05, mode, speed, brightness, 0x00, 0x00}`
 
 | Mode | Value | Description |
-|------|-------|-------------|
+| ------ | ------- | ------------- |
 | Static | 0x01 | Single color static |
 | Breathing | 0x02 | Breath effect |
 | Rainbow/Transition | 0x03 | Rainbow transition |
@@ -58,13 +59,16 @@ Speed values: `SLOW=0x12`, `NORMAL=0x22`, `FASTER=0x32`, `FASTEST=0x42`
 Brightness values: `OFF=0x00`, `QUARTER=0x01`, `HALF=0x02`, `THREE_QUARTERS=0x03`, `FULL=0x04`
 
 ### Report ID 6 (LED Data) — 1032 bytes
+
 Header: `{0x06, 0x08, 0xB8, 0x00, 0x40, ...}`
+
 - Per-key data at specific offsets (see `tkl_keys_per_key_index` in existing controller)
 - **BGR byte order** (not RGB!) — blue, green, red channels
 
 ## Building the Plugin
 
 ### Prerequisites
+
 - Qt 6.4+ development tools (`qtbase6-dev-tools`, `qmake6`)
 - hidapi library (`libhidapi-hidraw0-dev`)
 - OpenRGB source headers (clone from gitlab.com/OpenRGBDevelopers/OpenRGB)
@@ -98,21 +102,19 @@ patchelf --set-rpath '/tmp/appimg_extract/usr/lib:$ORIGIN' libOpenGK850WPlugin.s
 
 ## Usage
 
-1. Copy `libOpenGK850WPlugin.so` to `~/.config/OpenRGB/plugins/`
-2. Launch OpenRGB (AppImage or compiled version)
-3. Plugin will auto-detect GK850W keyboard via VID:PID + product string verification
-4. Virtual controller appears in device list — use as any other RGB controller
-5. **Effects Plugin is fully compatible** — all standard lighting effects work
+1. Install Plugin using OpenRGB
+2. Plugin will auto-detect GK850W keyboard via VID:PID + product string verification
+3. Virtual controller appears in device list as normal
 
 ## Compatibility Notes
 
-- ✅ OpenRGB Effects Plugin works (virtual controllers expose standard LED arrays)
+- ✅ OpenRGB Effects Plugin not compatible (Keyboard doesn't have a "Direct" mode, using effects may wear out the flash, or reset)
 - ✅ No main repo patching required
-- ✅ Safe for GK850W only (product string check prevents brick risk on other devices)
-- ⚠️ Requires root/hidraw access to keyboard device (install udev rules from https://openrgb.org/udev)
+- ✅ Only detects the right keyboard (product string check prevents sending data to other keyboards)
+- ⚠️ Requires udev rules on Linux (script to install udev-setup.sh in repo)
 
 ## Author
 
 garfi-kod, michaumiau 2026
-
-Based on PCAP analysis and existing Sinowealth controller implementations in OpenRGB.
+Based on PCAP analysis of the original software.
+GPL-2 License (same as upstream)

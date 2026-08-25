@@ -1,1 +1,1 @@
-list of skills
+# Hermes agent skills created while reverse engineering
