@@ -1,3 +1,59 @@
+ ============================================================================
+  GK850W UPSTREAM CONTROLLER PATCH - UNMAINTAINED / UNSUPPORTED
+ ============================================================================
+
+  STATUS: This patch is NOT actively maintained. The supported way to
+  use the GK850W with OpenRGB is the standalone plugin in this repo
+  (plugin/ directory) - it has all the fixes and discoveries listed
+  below, does not require patching OpenRGB, and cannot brick other
+  devices sharing VID:PID 258a:0049.
+
+  WHY: the standalone plugin approach won. Keeping this patch in sync
+  doubled the maintenance work for no benefit. It is kept for reference
+  and for anyone who specifically wants a native (in-tree) controller.
+
+  IF YOU RESURRECT THIS PATCH, incorporate the protocol knowledge from
+  the plugin (see ADDENDA at the bottom of this file). The diff hunks
+  below contain EARLY, PARTIALLY INCORRECT assumptions - notably:
+
+    * The mode ID table in SinowealthGK850WController.h is WRONG.
+      Verified effect IDs (from all-modes sweep + live-pick captures):
+        Breathing=0x02, Spectrum Cycle=0x03, Rainbow Wave=0x04,
+        Rain=0x05, Double Spectrum=0x06, Water Drop=0x07,
+        Twinkling Stars=0x08, Shadow=0x09, Snake=0x0A, Neon Wave=0x0B,
+        Trail=0x0C, Sine Wave=0x0D, Scan=0x0E, Carousel=0x0F,
+        Waterfall=0x10, Pulsing=0x11, Explosion=0x12, Collision=0x13,
+        Flashing=0x14, Game/per-key=0x15, Off=0x16.
+      The 0x8x IDs in the hunk were early guesses that do not work.
+
+    * Effect color is read by firmware from report C08 (rid6 sub=8)
+      at offset [eid*21+8 .. +10] = R,G,B. Not from commit[29:31].
+
+    * Each effect carries PER-EFFECT flag bytes in the commit report
+      (positions 40,46,52,54,56,58,64). See plugin's
+      gk850_effect_flags.h for the verified table.
+
+    * Random Color toggles ONE per-effect selector byte 00->07:
+      selector position = 36 + 2*effect_id (decimal).
+      Verified: breathing[40], stars[52], snake[56], flashing[76].
+      See gk850_random_selectors.h.
+
+    * Vendor polls status (GET rid6, expects "44 00 00 00") after each
+      rid5 unlock before big writes.
+
+    * commit[69] = (speed<<4)|brightness (nibbles 1..4).
+
+    * Flash-save ("Zastosuj" button): unlock 05 84 d4 -> poll ->
+      rid6 sub=4 config snapshot -> K03 again.
+
+    * Per-key mode: init1 once on entry, then stream 06 09 bc/c0,
+      commit only on entry. Firmware restarts the lighting engine on
+      every per-key write (brief black flash) - vendor software does
+      the same; there is NO realtime/direct mode in this firmware
+      generation (confirmed against OpenRGB upstream: F11-family
+      keyboards are documented @direct :x:).
+
+ ============================================================================
 diff --git a/Controllers/SinowealthController/SinowealthControllerDetect.cpp b/Controllers/SinowealthController/SinowealthControllerDetect.cpp
 index 09b2859..3d3486a 100644
 --- a/Controllers/SinowealthController/SinowealthControllerDetect.cpp
