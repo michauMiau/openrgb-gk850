@@ -231,7 +231,6 @@ unsigned int OpenGK850WPlugin::CurrentMode()
 
         // Match by mode name - stable regardless of list order.
         if(name == "Custom")        return MODE_PER_KEY;
-        if(name == "Direct")        return MODE_PER_KEY;
         if(name == "Static")        return MODE_STATIC;
         if(name == "Off")           return MODE_OFF;
 
@@ -607,16 +606,6 @@ void OpenGK850WPlugin::Load(OpenRGBPluginAPIInterface* plugin_api_ptr)
     m.brightness_min = 0;
     m.brightness_max = 4;
     m.brightness = 4;
-    setup.modes.push_back(m);
-
-    // Direct: same per-key packet path but flagged as OpenRGB Direct mode
-    // so the effects engine streams at full speed (no per-key commit,
-    // no throttle - SendPerKeyPacket already skips init/commit when
-    // streaming). Flicker-free since v1.1.x streaming path.
-    m.name = "Direct";
-    m.value = MODE_PER_KEY;
-    m.flags = MODE_FLAG_HAS_PER_LED_COLOR | MODE_FLAG_MANUAL_SAVE;
-    m.color_mode = MODE_COLORS_PER_LED;
     setup.modes.push_back(m);
 
     // Static: whole device set to one static color (may flicker/save).
@@ -1060,7 +1049,7 @@ OpenRGBPluginInfo OpenGK850WPlugin::GetPluginInfo()
     OpenRGBPluginInfo info;
     info.Name = "GK850W";
     info.Description = "Plugin implementing support for the GK850W keyboard";
-    info.Version = "4.0";
+    info.Version = "4.1";
     info.Commit = "local-build";
     info.URL = "https://github.com/michauMiau/openrgb-gk850";
     info.Location = OPENRGB_PLUGIN_LOCATION_TOP;
