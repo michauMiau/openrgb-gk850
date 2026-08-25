@@ -1,19 +1,19 @@
 # OpenRGB GK850W Plugin
 
-OpenRGB plugin for the **BY Tech / Mad Dog GK850(W)** keyboard — full control over all 19 hardware effects, custom colors, and per-key painting. No patching of the OpenRGB source required; it ships as a standalone plugin using the Virtual Controller API.
+OpenRGB plugin for the **BY Tech / Mad Dog GK850(W)** keyboard with full control over all 19 hardware effects, custom colors, and per-key painting. Ships as a standalone plugin using the Virtual Controller API.
 
 ## Features
 
-- ✅ **All 19 hardware effects** with working custom color selection
-- 🎲 **Random Color mode** on every effect that supports it (per-effect selector byte, reverse-engineered from USB captures: `selector = 36 + 2×effect_id`)
+- ✅ **All 19 hardware effects** with working custom color selection.
+- 🎲 **Random Color mode** on every effect that supports it.
 - 💡 Brightness and speed control (mapped to vendor nibbles)
-- 🎨 **Custom / per-key mode** for painting patterns and artwork across the 61-key layout
-- 🔌 Plug-and-play: auto-detection via VID/PID + product string verification
-- 🏷️ Manual save button persists current state to keyboard flash
+- 🎨 **Custom / per-key mode** for painting patterns and artwork across the 61-key layout.
+- 🔌 Plug-and-play: auto-detection via VID/PID + product string verification.
+- 🏷️ Manual save button persists current state to keyboard flash.
 
 ### Known limitation
 
-Per-key updates briefly flash black — this is a firmware behavior of the Sinowealth BY916 chip, not a plugin bug (the vendor application flickers identically). There is no realtime/direct mode in this protocol generation; effects run at hardware speed instead.
+Per-key updates briefly flash black, this is a firmware behavior of the Sinowealth BY916 chip, not a plugin bug (the vendor application flickers identically). There is no realtime/direct mode in this keyboard; built in keyboard effects run at hardware speed instead.
 
 ## Device Identification
 
@@ -85,5 +85,5 @@ Reverse-engineered from USB HID captures of the vendor software (see `hid-pcap-a
 ## Author
 
 garfi-kod, michaumiau 2026
-Based on PCAP analysis of the original vendor software.
+Based on PCAP analysis of the original vendor software, and some analysis from the SinowealthController in OpenRGB, no code made it's way directly though.
 GPL-2 License (same as upstream)
